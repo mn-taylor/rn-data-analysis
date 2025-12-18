@@ -1,0 +1,1472 @@
+[
+  {
+    "run_id": "2511051033",
+    "patient_id": 1004,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T17:33:43.722000"
+  },
+  {
+    "run_id": "2511051044",
+    "patient_id": 1005,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T17:44:23.415000"
+  },
+  {
+    "run_id": "2511051054",
+    "patient_id": 1006,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T17:54:14.157000"
+  },
+  {
+    "run_id": "2511051213",
+    "patient_id": 1002,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T19:13:24.735000"
+  },
+  {
+    "run_id": "2511051223",
+    "patient_id": 1003,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T19:23:53.106000"
+  },
+  {
+    "run_id": "2511051231",
+    "patient_id": 1007,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T19:31:56.955000"
+  },
+  {
+    "run_id": "2511051242",
+    "patient_id": 1009,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T19:42:57.294000"
+  },
+  {
+    "run_id": "2511051307",
+    "patient_id": 1011,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T20:07:50.799000"
+  },
+  {
+    "run_id": "2511051329",
+    "patient_id": 1013,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T20:29:24.171000"
+  },
+  {
+    "run_id": "2511051338",
+    "patient_id": 1014,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T20:38:51.270000"
+  },
+  {
+    "run_id": "2511051348",
+    "patient_id": 1016,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T20:48:15.039000"
+  },
+  {
+    "run_id": "2511051356",
+    "patient_id": 1015,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T20:56:06.234000"
+  },
+  {
+    "run_id": "2511051413",
+    "patient_id": 1018,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T21:13:43.509000"
+  },
+  {
+    "run_id": "2511051431",
+    "patient_id": 1020,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T21:31:09.462000"
+  },
+  {
+    "run_id": "2511051439",
+    "patient_id": 1021,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-05T21:39:45.945000"
+  },
+  {
+    "run_id": "2511061128",
+    "patient_id": 1024,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100804",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-06T11:28:10.524000"
+  },
+  {
+    "run_id": "2511061205",
+    "patient_id": 1027,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100804",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-06T12:05:15.963000"
+  },
+  {
+    "run_id": "2511061441",
+    "patient_id": 1042,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100804",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-06T14:41:51.891000"
+  },
+  {
+    "run_id": "2511061455",
+    "patient_id": 1043,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100804",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-06T14:55:27.075000"
+  },
+  {
+    "run_id": "2511061507",
+    "patient_id": 1044,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100804",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-06T15:07:47.001000"
+  },
+  {
+    "run_id": "2511061603",
+    "patient_id": 1046,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100804",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-06T16:03:13.005000"
+  },
+  {
+    "run_id": "2511061624",
+    "patient_id": 1047,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100804",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-06T16:24:39.384000"
+  },
+  {
+    "run_id": "2511100427",
+    "patient_id": 1035,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T11:27:19.296000"
+  },
+  {
+    "run_id": "2511100436",
+    "patient_id": 1041,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T11:36:59.382000"
+  },
+  {
+    "run_id": "2511100447",
+    "patient_id": 1029,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T11:47:19.095000"
+  },
+  {
+    "run_id": "2511100502",
+    "patient_id": 1040,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T12:02:45.168000"
+  },
+  {
+    "run_id": "2511100523",
+    "patient_id": 1032,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T12:23:26.925000"
+  },
+  {
+    "run_id": "2511100535",
+    "patient_id": 1039,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T12:35:12.219000"
+  },
+  {
+    "run_id": "2511100543",
+    "patient_id": 1037,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T12:43:55.029000"
+  },
+  {
+    "run_id": "2511100553",
+    "patient_id": 1033,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T12:53:59.091000"
+  },
+  {
+    "run_id": "2511100603",
+    "patient_id": 1034,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T13:03:07.209000"
+  },
+  {
+    "run_id": "2511100612",
+    "patient_id": 1031,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T13:12:15.660000"
+  },
+  {
+    "run_id": "2511100631",
+    "patient_id": 1061,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T13:31:50.151000"
+  },
+  {
+    "run_id": "2511100642",
+    "patient_id": 1057,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T13:42:48.492000"
+  },
+  {
+    "run_id": "2511100652",
+    "patient_id": 1052,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T13:52:45.561000"
+  },
+  {
+    "run_id": "2511100716",
+    "patient_id": 1049,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T14:16:49.782000"
+  },
+  {
+    "run_id": "2511100725",
+    "patient_id": 1060,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T14:25:22.269000"
+  },
+  {
+    "run_id": "2511100822",
+    "patient_id": 1036,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T15:22:34.500000"
+  },
+  {
+    "run_id": "2511100831",
+    "patient_id": 1059,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T15:31:04.989000"
+  },
+  {
+    "run_id": "2511100844",
+    "patient_id": 1056,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T15:44:16.530000"
+  },
+  {
+    "run_id": "2511100858",
+    "patient_id": 1065,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T15:58:36.669000"
+  },
+  {
+    "run_id": "2511100906",
+    "patient_id": 1066,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T16:06:38.187000"
+  },
+  {
+    "run_id": "2511100916",
+    "patient_id": 1038,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T16:16:35.922000"
+  },
+  {
+    "run_id": "2511100930",
+    "patient_id": 1051,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T16:30:10.773000"
+  },
+  {
+    "run_id": "2511100947",
+    "patient_id": 1068,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T16:47:56.040000"
+  },
+  {
+    "run_id": "2511101106",
+    "patient_id": 1058,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T18:06:09.342000"
+  },
+  {
+    "run_id": "2511101129",
+    "patient_id": 1050,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T18:29:24.279000"
+  },
+  {
+    "run_id": "2511101202",
+    "patient_id": 1064,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T19:02:50.271000"
+  },
+  {
+    "run_id": "2511101234",
+    "patient_id": 1048,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T19:34:57.009000"
+  },
+  {
+    "run_id": "2511101253",
+    "patient_id": 1055,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T19:53:06.585000"
+  },
+  {
+    "run_id": "2511101348",
+    "patient_id": 1082,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T20:48:48.240000"
+  },
+  {
+    "run_id": "2511101356",
+    "patient_id": 1081,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-10T20:56:06.135000"
+  },
+  {
+    "run_id": "2511110340",
+    "patient_id": 1083,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T10:40:20.631000"
+  },
+  {
+    "run_id": "2511110348",
+    "patient_id": 1084,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T10:48:54.117000"
+  },
+  {
+    "run_id": "2511110357",
+    "patient_id": 1085,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T10:57:39.591000"
+  },
+  {
+    "run_id": "2511110407",
+    "patient_id": 1086,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T11:07:19.011000"
+  },
+  {
+    "run_id": "2511110425",
+    "patient_id": 1087,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T11:25:30.918000"
+  },
+  {
+    "run_id": "2511110436",
+    "patient_id": 1088,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T11:36:26.262000"
+  },
+  {
+    "run_id": "2511110454",
+    "patient_id": 1090,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T11:54:30.843000"
+  },
+  {
+    "run_id": "2511110503",
+    "patient_id": 1091,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T12:03:57.609000"
+  },
+  {
+    "run_id": "2511110515",
+    "patient_id": 1092,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T12:15:44.235000"
+  },
+  {
+    "run_id": "2511110526",
+    "patient_id": 1093,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T12:26:12.939000"
+  },
+  {
+    "run_id": "2511110537",
+    "patient_id": 1094,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T12:37:16.275000"
+  },
+  {
+    "run_id": "2511110545",
+    "patient_id": 1095,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T12:45:49.428000"
+  },
+  {
+    "run_id": "2511110555",
+    "patient_id": 1096,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T12:55:02.208000"
+  },
+  {
+    "run_id": "2511110603",
+    "patient_id": 1097,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T13:03:25.038000"
+  },
+  {
+    "run_id": "2511110717",
+    "patient_id": 1099,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T14:17:45.906000"
+  },
+  {
+    "run_id": "2511110729",
+    "patient_id": 1100,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T14:29:43.854000"
+  },
+  {
+    "run_id": "2511110740",
+    "patient_id": 1101,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T14:40:54.849000"
+  },
+  {
+    "run_id": "2511110749",
+    "patient_id": 1102,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T14:49:49.647000"
+  },
+  {
+    "run_id": "2511110800",
+    "patient_id": 1103,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T15:00:57.645000"
+  },
+  {
+    "run_id": "2511110813",
+    "patient_id": 1104,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T15:13:04.584000"
+  },
+  {
+    "run_id": "2511110821",
+    "patient_id": 1105,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T15:21:30.078000"
+  },
+  {
+    "run_id": "2511110833",
+    "patient_id": 1098,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T15:33:12.375000"
+  },
+  {
+    "run_id": "2511110847",
+    "patient_id": 1106,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T15:47:09.537000"
+  },
+  {
+    "run_id": "2511110854",
+    "patient_id": 1107,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T15:54:56.070000"
+  },
+  {
+    "run_id": "2511110904",
+    "patient_id": 1108,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T16:04:11.181000"
+  },
+  {
+    "run_id": "2511110925",
+    "patient_id": 1109,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T16:25:03.261000"
+  },
+  {
+    "run_id": "2511110933",
+    "patient_id": 1110,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T16:33:20.763000"
+  },
+  {
+    "run_id": "2511110941",
+    "patient_id": 1111,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T16:41:44.592000"
+  },
+  {
+    "run_id": "2511110950",
+    "patient_id": 1112,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T16:50:30.066000"
+  },
+  {
+    "run_id": "2511111009",
+    "patient_id": 1113,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T17:09:16.938000"
+  },
+  {
+    "run_id": "2511111025",
+    "patient_id": 1114,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T17:25:18.975000"
+  },
+  {
+    "run_id": "2511111037",
+    "patient_id": 1115,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T17:37:54.552000"
+  },
+  {
+    "run_id": "2511111058",
+    "patient_id": 1117,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T17:58:18.327000"
+  },
+  {
+    "run_id": "2511111111",
+    "patient_id": 1118,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T18:11:23.208000"
+  },
+  {
+    "run_id": "2511111132",
+    "patient_id": 1119,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T18:32:10.959000"
+  },
+  {
+    "run_id": "2511111144",
+    "patient_id": 1120,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T18:44:47.535000"
+  },
+  {
+    "run_id": "2511111152",
+    "patient_id": 1121,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T18:52:51.051000"
+  },
+  {
+    "run_id": "2511111201",
+    "patient_id": 1122,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T19:01:07.221000"
+  },
+  {
+    "run_id": "2511111209",
+    "patient_id": 1123,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T19:09:14.733000"
+  },
+  {
+    "run_id": "2511111217",
+    "patient_id": 1124,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T19:17:45.888000"
+  },
+  {
+    "run_id": "2511111225",
+    "patient_id": 1125,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T19:25:26.760000"
+  },
+  {
+    "run_id": "2511111233",
+    "patient_id": 1126,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T19:33:19.287000"
+  },
+  {
+    "run_id": "2511111240",
+    "patient_id": 1127,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T19:40:34.518000"
+  },
+  {
+    "run_id": "2511111249",
+    "patient_id": 1128,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T19:49:45.966000"
+  },
+  {
+    "run_id": "2511111258",
+    "patient_id": 1129,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T19:58:52.752000"
+  },
+  {
+    "run_id": "2511111306",
+    "patient_id": 1130,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T20:06:45.279000"
+  },
+  {
+    "run_id": "2511111318",
+    "patient_id": 1131,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T20:18:06.264000"
+  },
+  {
+    "run_id": "2511111336",
+    "patient_id": 1132,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T20:36:58.797000"
+  },
+  {
+    "run_id": "2511111345",
+    "patient_id": 1133,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T20:45:36.279000"
+  },
+  {
+    "run_id": "2511111355",
+    "patient_id": 1028,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T20:55:42.672000"
+  },
+  {
+    "run_id": "2511111404",
+    "patient_id": 1134,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T21:04:12.495000"
+  },
+  {
+    "run_id": "2511111413",
+    "patient_id": 1135,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T21:13:28.272000"
+  },
+  {
+    "run_id": "2511111431",
+    "patient_id": 1137,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T21:31:16.536000"
+  },
+  {
+    "run_id": "2511111438",
+    "patient_id": 1138,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T21:38:44.088000"
+  },
+  {
+    "run_id": "2511111445",
+    "patient_id": 1139,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-11T21:45:51.660000"
+  },
+  {
+    "run_id": "2511120401",
+    "patient_id": 1140,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T11:01:31.206000"
+  },
+  {
+    "run_id": "2511120421",
+    "patient_id": 1141,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T11:21:06.363000"
+  },
+  {
+    "run_id": "2511120635",
+    "patient_id": 1019,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T13:35:31.956000"
+  },
+  {
+    "run_id": "2511120642",
+    "patient_id": 1017,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T13:42:42.192000"
+  },
+  {
+    "run_id": "2511120659",
+    "patient_id": 1030,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T13:59:12.534000"
+  },
+  {
+    "run_id": "2511120705",
+    "patient_id": 1001,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T14:05:31.488000"
+  },
+  {
+    "run_id": "2511120712",
+    "patient_id": 1012,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T14:12:33.399000"
+  },
+  {
+    "run_id": "2511120718",
+    "patient_id": 1010,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T14:18:37.368000"
+  },
+  {
+    "run_id": "2511120724",
+    "patient_id": 1045,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T14:24:16.362000"
+  },
+  {
+    "run_id": "2511120730",
+    "patient_id": 1054,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T14:30:14.004000"
+  },
+  {
+    "run_id": "2511120744",
+    "patient_id": 1026,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T14:44:34.143000"
+  },
+  {
+    "run_id": "2511120805",
+    "patient_id": 1180,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T15:05:04.245000"
+  },
+  {
+    "run_id": "2511120810",
+    "patient_id": 1149,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T15:10:50.232000"
+  },
+  {
+    "run_id": "2511120817",
+    "patient_id": 1168,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T15:17:29.832000"
+  },
+  {
+    "run_id": "2511120823",
+    "patient_id": 1151,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T15:23:04.830000"
+  },
+  {
+    "run_id": "2511120839",
+    "patient_id": 1150,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T15:39:11.529000"
+  },
+  {
+    "run_id": "2511120845",
+    "patient_id": 1159,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T15:45:42.804000"
+  },
+  {
+    "run_id": "2511120854",
+    "patient_id": 1148,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T15:54:56.583000"
+  },
+  {
+    "run_id": "2511120900",
+    "patient_id": 1152,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T16:00:49.896000"
+  },
+  {
+    "run_id": "2511120907",
+    "patient_id": 1164,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T16:07:00.858000"
+  },
+  {
+    "run_id": "2511120918",
+    "patient_id": 1165,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T16:18:28.170000"
+  },
+  {
+    "run_id": "2511120928",
+    "patient_id": 1162,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T16:28:58.206000"
+  },
+  {
+    "run_id": "2511120943",
+    "patient_id": 1157,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T16:43:11.019000"
+  },
+  {
+    "run_id": "2511120949",
+    "patient_id": 1025,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T16:49:21.315000"
+  },
+  {
+    "run_id": "2511120955",
+    "patient_id": 1156,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T16:55:27.615000"
+  },
+  {
+    "run_id": "2511121004",
+    "patient_id": 1166,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T17:04:28.407000"
+  },
+  {
+    "run_id": "2511121010",
+    "patient_id": 1158,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T17:10:12.396000"
+  },
+  {
+    "run_id": "2511121016",
+    "patient_id": 1022,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T17:16:52.662000"
+  },
+  {
+    "run_id": "2511121022",
+    "patient_id": 1176,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T17:22:56.631000"
+  },
+  {
+    "run_id": "2511121028",
+    "patient_id": 1146,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T17:28:35.625000"
+  },
+  {
+    "run_id": "2511121045",
+    "patient_id": 1160,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T17:45:42.597000"
+  },
+  {
+    "run_id": "2511121051",
+    "patient_id": 1177,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T17:51:20.259000"
+  },
+  {
+    "run_id": "2511121056",
+    "patient_id": 1163,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T17:56:51.927000"
+  },
+  {
+    "run_id": "2511121103",
+    "patient_id": 1155,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T18:03:01.557000"
+  },
+  {
+    "run_id": "2511121110",
+    "patient_id": 1153,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T18:10:09.462000"
+  },
+  {
+    "run_id": "2511121119",
+    "patient_id": 1169,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T18:19:13.251000"
+  },
+  {
+    "run_id": "2511121126",
+    "patient_id": 1175,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T18:26:05.172000"
+  },
+  {
+    "run_id": "2511121138",
+    "patient_id": 1161,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T18:38:08.781000"
+  },
+  {
+    "run_id": "2511121144",
+    "patient_id": 1170,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T18:44:04.425000"
+  },
+  {
+    "run_id": "2511121155",
+    "patient_id": 1008,
+    "tags": [
+      "100%"
+    ],
+    "device_id": "100812",
+    "chip_id": "YAG99",
+    "measured_at": "2025-11-12T18:55:40.062000"
+  }
+]
