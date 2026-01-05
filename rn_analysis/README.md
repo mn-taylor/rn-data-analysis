@@ -15,12 +15,13 @@ sys.path.insert(0, "/path/to/rn-data-analysis")
 
 ```
 rn_analysis/
-├── __init__.py          # Package initialization
-├── config.py            # Configuration dataclasses
-├── dataloader.py        # Dataset classes and data utilities
-├── models.py            # Neural network architectures
-├── train.py             # Training and evaluation functions
-└── utils.py             # Visualization and helper functions
+├── __init__.py            # Package initialization
+├── config.py              # Configuration dataclasses
+├── dataloader.py          # Dataset classes and data utilities
+├── models.py              # Neural network architectures
+├── train.py               # Training and evaluation functions
+├── utils.py               # Visualization and helper functions
+└── feature_importance.py  # Feature importance analysis methods
 ```
 
 ## Quick Start
@@ -80,7 +81,39 @@ results = stratified_kfold_cv(
 print(f"Mean AUC: {results['mean_auc']:.4f} ± {results['std_auc']:.4f}")
 ```
 
-### 3. Visualize Data
+### 3. Feature Importance Analysis
+
+```python
+from rn_analysis.feature_importance import (
+    compute_permutation_importance,
+    compute_temporal_importance,
+    plot_feature_importance
+)
+
+# Permutation importance (model-agnostic)
+perm_results = compute_permutation_importance(
+    model=model,
+    dataloader=test_loader,
+    feature_names=feature_cols,
+    device="cuda",
+    n_repeats=10,
+    metric="accuracy"
+)
+
+# Plot top features
+plot_feature_importance(perm_results, top_k=20, save_path="importance.png")
+
+# Temporal importance (shows which features matter when)
+temporal_results = compute_temporal_importance(
+    model=model,
+    dataloader=test_loader,
+    feature_names=feature_cols,
+    device="cuda",
+    method="integrated_gradients"
+)
+```
+
+### 4. Visualize Data
 
 ```python
 from rn_analysis.utils import visualize_run_cycle_csv
@@ -113,6 +146,8 @@ See the `examples/` directory for complete working examples:
 - `train_transformer.py`: Train Transformer
 - `train_kfold.py`: K-fold CV with model comparison
 - `visualize_data.py`: Visualize sensor data
+- `analyze_features.py`: Feature importance analysis for a single model
+- `analyze_features_kfold.py`: Feature importance across k-fold CV
 
 ## Data Format
 
@@ -141,7 +176,9 @@ Each CSV should have:
 - **Flexible data loading**: Supports both (C, T) and (T, C) formats
 - **Multiple models**: 5 SOTA architectures included
 - **K-fold CV**: Stratified cross-validation with early stopping
-- **Visualization**: Built-in plotting for data and results
+- **Feature importance**: Permutation importance and integrated gradients for interpretability
+- **Temporal analysis**: Understand which features matter at different time points
+- **Visualization**: Built-in plotting for data, results, and feature importance
 - **Reproducible**: Seed setting for deterministic results
 
 ## License
