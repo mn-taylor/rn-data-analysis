@@ -1,3 +1,5 @@
 *.csv
 data/
 best_model.pt
+
+examples/feature_analysis_kfold/

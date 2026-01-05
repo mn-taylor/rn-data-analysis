@@ -54,7 +54,7 @@ def parse_args():
     parser.add_argument(
         "--data-root",
         type=str,
-        default="data",
+        default="/home/keaneong/rn-data-analysis/data",
         help="Root directory containing POSITIVE/ and CONTROL/ subdirectories",
     )
     parser.add_argument(
@@ -239,18 +239,25 @@ def main():
             model.load_state_dict(torch.load(model_path, map_location=device))
         elif train_if_missing:
             print(f"Training model for fold {fold_idx}...")
-            model, history = train_model(
+            model = model.to(device)
+            optimizer = torch.optim.AdamW(
+                model.parameters(),
+                lr=config["lr"],
+                weight_decay=1e-2
+            )
+            loss_fn = torch.nn.CrossEntropyLoss()
+
+            history = train_model(
                 model=model,
                 train_loader=train_loader,
-                test_loader=test_loader,
+                val_loader=test_loader,
+                optimizer=optimizer,
+                loss_fn=loss_fn,
+                device=device,
                 epochs=args.epochs,
-                lr=config["lr"],
-                weight_decay=1e-2,
-                device=str(device),
                 early_stopping_patience=10,
+                checkpoint_path=model_path,
             )
-            # Save model
-            torch.save(model.state_dict(), model_path)
             print(f"Saved model to {model_path}")
         else:
             raise FileNotFoundError(
