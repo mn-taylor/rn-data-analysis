@@ -55,6 +55,9 @@ def compute_permutation_importance(
     print(f"Baseline {metric}: {baseline_score:.4f}")
     print(f"\nComputing permutation importance for {n_features} features...")
 
+    # Track some permuted scores for debugging
+    debug_scores = []
+
     for feat_idx in tqdm(range(n_features), desc="Features"):
         for repeat_idx in range(n_repeats):
             # Permute this feature and evaluate
@@ -64,8 +67,25 @@ def compute_permutation_importance(
             # Importance = drop in performance
             importance_scores[feat_idx, repeat_idx] = baseline_score - score
 
+            # Store first 3 features' scores for debugging
+            if feat_idx < 3 and repeat_idx == 0:
+                debug_scores.append((feature_names[feat_idx], score, baseline_score - score))
+
+    # Print debug info
+    if debug_scores:
+        print("\nDebug: First 3 features permutation results:")
+        for fname, perm_score, importance in debug_scores:
+            print(f"  {fname}: permuted_score={perm_score:.4f}, importance={importance:.4f}")
+
+    mean_importances = importance_scores.mean(axis=1)
+    print(f"\nImportance statistics:")
+    print(f"  Min: {mean_importances.min():.6f}")
+    print(f"  Max: {mean_importances.max():.6f}")
+    print(f"  Mean: {mean_importances.mean():.6f}")
+    print(f"  Non-zero features: {(mean_importances > 1e-6).sum()} / {n_features}")
+
     return {
-        "importances": importance_scores.mean(axis=1),
+        "importances": mean_importances,
         "importances_std": importance_scores.std(axis=1),
         "baseline_score": baseline_score,
         "feature_names": feature_names,
@@ -115,7 +135,10 @@ def _evaluate_model_with_permutation(
     feature_idx: int,
     metric: str = "accuracy",
 ) -> float:
-    """Evaluate model with one feature permuted."""
+    """Evaluate model with one feature permuted.
+
+    Note: Assumes data is in (B, C, T) format where C is the channel/feature dimension.
+    """
     model.eval()
     all_preds = []
     all_labels = []
@@ -126,13 +149,18 @@ def _evaluate_model_with_permutation(
             X, y = X.to(device), y.to(device)
 
             # Permute the feature across samples in batch
+            # Data should be in (B, C, T) format from the dataloader
             X_perm = X.clone()
-            if X.dim() == 3 and X.shape[1] > X.shape[2]:  # (B, C, T) format
-                perm_idx = torch.randperm(X.shape[0])
+            if X.dim() == 3:
+                # For (B, C, T) format, permute along channel dimension (dim=1)
+                perm_idx = torch.randperm(X.shape[0], device=device)
                 X_perm[:, feature_idx, :] = X[perm_idx, feature_idx, :]
-            elif X.dim() == 3:  # (B, T, C) format
-                perm_idx = torch.randperm(X.shape[0])
-                X_perm[:, :, feature_idx] = X[perm_idx, :, feature_idx]
+            elif X.dim() == 2:
+                # For (B, C) format
+                perm_idx = torch.randperm(X.shape[0], device=device)
+                X_perm[:, feature_idx] = X[perm_idx, feature_idx]
+            else:
+                raise ValueError(f"Unexpected input dimension: {X.dim()}")
 
             logits = model(X_perm)
             probs = torch.softmax(logits, dim=1)
@@ -338,14 +366,21 @@ def plot_feature_importance(
     """Plot feature importance bar chart.
 
     Args:
-        importance_dict: Dictionary with "importances", "importances_std", "feature_names"
+        importance_dict: Dictionary with "importances"/"importances_mean", "importances_std", "feature_names"
         top_k: Number of top features to show
         figsize: Figure size
         save_path: Path to save figure (None = display only)
     """
     import matplotlib.pyplot as plt
 
-    importances = importance_dict["importances"]
+    # Handle both single-fold results (with "importances") and aggregated results (with "importances_mean")
+    if "importances_mean" in importance_dict:
+        importances = importance_dict["importances_mean"]
+    elif "importances" in importance_dict:
+        importances = importance_dict["importances"]
+    else:
+        raise KeyError("importance_dict must contain either 'importances' or 'importances_mean'")
+
     feature_names = importance_dict["feature_names"]
 
     # Get std if available
@@ -444,14 +479,24 @@ def save_importance_results(
     """
     import pandas as pd
 
-    df = pd.DataFrame({
-        "feature": importance_dict["feature_names"],
-        "importance": importance_dict["importances"],
-    })
+    # Handle both single-fold results (with "importances") and aggregated results (with "importances_mean")
+    if "importances_mean" in importance_dict:
+        df = pd.DataFrame({
+            "feature": importance_dict["feature_names"],
+            "importance_mean": importance_dict["importances_mean"],
+        })
+        if "importances_std" in importance_dict:
+            df["importance_std"] = importance_dict["importances_std"]
+    elif "importances" in importance_dict:
+        df = pd.DataFrame({
+            "feature": importance_dict["feature_names"],
+            "importance": importance_dict["importances"],
+        })
+        if "importances_std" in importance_dict:
+            df["importance_std"] = importance_dict["importances_std"]
+    else:
+        raise KeyError("importance_dict must contain either 'importances' or 'importances_mean'")
 
-    if "importances_std" in importance_dict:
-        df["importance_std"] = importance_dict["importances_std"]
-
-    df = df.sort_values("importance", ascending=False)
+    df = df.sort_values(by=df.columns[1], ascending=False)  # Sort by importance column (1st data column)
     df.to_csv(save_path, index=False)
     print(f"Saved feature importance results to {save_path}")
