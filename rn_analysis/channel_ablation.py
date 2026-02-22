@@ -57,8 +57,11 @@ def identify_channel_groups(
 
         for i, name in enumerate(feature_names):
             for pfx in prefixes:
-                # Match: starts with prefix, followed by non-digit (or end)
-                if re.match(rf"^{re.escape(pfx)}(?!\d)", name):
+                # Match the prefix number anywhere in the name, but only as a
+                # complete numeric token (not as part of a longer number).
+                # e.g. "301_avg", "Avg_301", "avg_301_resistance" all match
+                # prefix 301, but "3010_foo" does not.
+                if re.search(rf"(?<!\d){re.escape(pfx)}(?!\d)", name):
                     indices.append(i)
                     break  # each channel belongs to at most one prefix match
 
