@@ -1,0 +1,106 @@
+# =============================================================================
+# K-Fold Feature Importance Analysis — Configuration
+# =============================================================================
+# Run with:
+#   python examples/analyze_features_kfold.py --config examples/configs/analyze_kfold.yaml
+
+
+# -----------------------------------------------------------------------------
+# Device
+# -----------------------------------------------------------------------------
+device: cuda      # cuda | cpu | mps
+
+
+# -----------------------------------------------------------------------------
+# Data
+# -----------------------------------------------------------------------------
+data:
+  root: /home/keaneong/rn-data-analysis/data   # root with POSITIVE/ and CONTROL/ subdirs
+  T: 512                                         # time-series length after resampling
+  batch_size: 32
+  seed: 42
+
+
+# -----------------------------------------------------------------------------
+# Model
+# -----------------------------------------------------------------------------
+model:
+  name: ImprovedCNN1D    # ImprovedCNN1D | ResNet1D | InceptionTime | ROCKET
+  dropout: 0.3
+
+  # InceptionTime-specific (ignored for other models)
+  n_filters: 32
+  depth: 6
+
+  # ROCKET-specific (ignored for other models)
+  num_kernels: 5000
+
+
+# -----------------------------------------------------------------------------
+# Training  (used when a fold's model checkpoint is not found on disk)
+# -----------------------------------------------------------------------------
+training:
+  train_if_missing: true          # set to false to error instead of training
+  epochs: 50
+  lr: 0.001
+  weight_decay: 0.01
+  early_stopping_patience: 10
+
+
+# -----------------------------------------------------------------------------
+# K-Fold cross-validation
+# -----------------------------------------------------------------------------
+kfold:
+  n_folds: 5
+
+
+# -----------------------------------------------------------------------------
+# Interpretability analysis
+# -----------------------------------------------------------------------------
+analysis:
+  metric: accuracy       # accuracy | auc
+
+  # Methods to run — comment out any line to skip that method.
+  # Note: integrated_gradients and shap require gradient flow and are
+  # automatically skipped for the ROCKET model.
+  methods:
+    - permutation
+    - occlusion
+    - integrated_gradients
+    - shap
+
+  # Permutation settings
+  n_repeats: 5           # permutation shuffles per feature per fold
+
+  # Integrated Gradients settings
+  ig_n_steps: 50         # Riemann integration steps
+  ig_target_class: 1     # class to attribute towards (1 = POSITIVE)
+  ig_n_samples: 200      # max samples per fold (null = use entire test set)
+
+  # SHAP GradientExplainer settings
+  shap_n_background: 50  # reference samples for the background distribution
+  shap_n_samples: 100    # test samples to explain per fold
+  shap_target_class: 1
+
+
+# -----------------------------------------------------------------------------
+# Channel group ablation
+# Channels are matched by their numeric prefix (e.g. "301_avg_resistance"
+# matches prefix 301).  All channels sharing a prefix are treated as a group.
+# -----------------------------------------------------------------------------
+channel_groups:
+  prostate:
+    display_name: "Prostate\n(OR51E1/OR51E2)"
+    prefixes: [301, 302, 401]
+
+  generalist:
+    display_name: "Generalist\n(hOR17-4)"
+    prefixes: [201, 202]
+
+
+# -----------------------------------------------------------------------------
+# Output
+# -----------------------------------------------------------------------------
+output:
+  save_dir: feature_analysis_kfold   # directory for all results
+  top_k: 20                          # number of top features to show in plots

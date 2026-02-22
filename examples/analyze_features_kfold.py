@@ -1,22 +1,37 @@
 """
-Example: Feature importance analysis across k-fold cross-validation.
+K-fold feature importance analysis — config-driven entry point.
 
-This script analyzes feature importance across multiple folds to get more
-robust estimates. It requires trained models from each fold.
+Usage
+-----
+    python examples/analyze_features_kfold.py \\
+        --config examples/configs/analyze_kfold.yaml
 
-If you don't have pretrained models from k-fold CV, you can:
-1. First run train_kfold.py to train models and save them
-2. Modify this script to train models on-the-fly (slower)
-3. Or just use analyze_features.py for single-model analysis
+All behaviour is controlled by the YAML config file.  See
+examples/configs/analyze_kfold.yaml for a fully annotated template.
+
+Outputs (written to output.save_dir)
+-------------------------------------
+  {model}_fold{k}.pth                  — per-fold model checkpoints
+  {model}_kfold_importance.png/csv     — aggregated permutation importance
+  {model}_per_fold_importance.csv      — raw per-fold permutation scores
+  {model}_stability.csv                — CV stability scores
+  {model}_all_methods.png              — side-by-side multi-method plot
+  {model}_all_methods.csv             — per-feature scores for all methods
+  {model}_method_correlations.csv     — Spearman ρ matrix
+  {model}_method_pvalues.csv          — p-value matrix
+  {model}_method_corr_heatmap.png     — Spearman ρ heatmap
+  {model}_ablation.png                — channel group ablation bar chart
+  {model}_ablation_results.csv        — ablation scores per condition
+  {model}_channel_groups.csv          — channel-to-group membership
 """
 
 import sys
 import os
 import argparse
 
-# Add parent directory to path to import rn_analysis
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import yaml
 import torch
 import pandas as pd
 import numpy as np
@@ -27,199 +42,394 @@ from rn_analysis.dataloader import (
     list_csvs_by_class,
     get_file_labels,
     create_dataloaders,
-    CycleDataset,
 )
-from rn_analysis.models import ImprovedCNN1D, ResNet1D, InceptionTime, RocketClassifier
+from rn_analysis.models import (
+    ImprovedCNN1D,
+    ResNet1D,
+    InceptionTime,
+    RocketClassifier,
+)
 from rn_analysis.train import train_model
 from rn_analysis.utils import set_seed, get_device
 from rn_analysis.feature_importance import (
     compute_permutation_importance,
+    compute_occlusion_importance,
+    compute_ig_channel_importance,
+    compute_shap_importance,
     aggregate_importance_across_folds,
+    compare_importance_methods,
     plot_feature_importance,
+    plot_multi_method_importance,
+    plot_method_comparison,
     save_importance_results,
+    save_method_comparison,
+)
+from rn_analysis.channel_ablation import (
+    identify_channel_groups,
+    run_channel_ablation,
+    aggregate_ablation_across_folds,
+    plot_ablation_results,
+    save_ablation_results,
 )
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="K-fold feature importance analysis for time series classification"
-    )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="ImprovedCNN1D",
-        choices=["ImprovedCNN1D", "ResNet1D", "InceptionTime", "ROCKET"],
-        help="Model architecture to analyze",
-    )
-    parser.add_argument(
-        "--data-root",
-        type=str,
-        default="/home/keaneong/rn-data-analysis/data",
-        help="Root directory containing POSITIVE/ and CONTROL/ subdirectories",
-    )
-    parser.add_argument(
-        "--save-dir",
-        type=str,
-        default="feature_analysis_kfold",
-        help="Directory to save results and models",
-    )
-    parser.add_argument(
-        "--n-folds",
-        type=int,
-        default=5,
-        help="Number of cross-validation folds",
-    )
-    parser.add_argument(
-        "--n-repeats",
-        type=int,
-        default=5,
-        help="Number of permutation repeats per feature (per fold)",
-    )
-    parser.add_argument(
-        "--no-train",
-        action="store_true",
-        help="Do not train models if missing (error instead)",
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=32,
-        help="Batch size for data loading",
-    )
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        default=50,
-        help="Number of epochs to train if models need to be trained",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed for reproducibility",
-    )
-    return parser.parse_args()
+# =============================================================================
+# Config helpers
+# =============================================================================
 
+def load_config(path: str) -> dict:
+    with open(path) as f:
+        return yaml.safe_load(f)
+
+
+# =============================================================================
+# Model factory
+# =============================================================================
+
+def build_model(model_name: str, input_channels: int, model_cfg: dict):
+    """Instantiate the model specified in the config."""
+    dropout = model_cfg.get("dropout", 0.3)
+
+    if model_name == "ImprovedCNN1D":
+        return ImprovedCNN1D(C=input_channels, dropout=dropout)
+
+    elif model_name == "ResNet1D":
+        return ResNet1D(
+            input_channels=input_channels,
+            num_classes=2,
+            dropout=dropout,
+        )
+
+    elif model_name == "InceptionTime":
+        return InceptionTime(
+            input_channels=input_channels,
+            num_classes=2,
+            n_filters=model_cfg.get("n_filters", 32),
+            depth=model_cfg.get("depth", 6),
+            dropout=dropout,
+        )
+
+    elif model_name == "ROCKET":
+        return RocketClassifier(
+            input_channels=input_channels,
+            num_classes=2,
+            num_kernels=model_cfg.get("num_kernels", 5000),
+            dropout=dropout,
+        )
+
+    else:
+        raise ValueError(f"Unknown model: {model_name!r}")
+
+
+# =============================================================================
+# Model loading / training
+# =============================================================================
+
+def get_or_train_model(
+    model,
+    model_path: str,
+    train_loader,
+    val_loader,
+    training_cfg: dict,
+    device,
+):
+    """Load model from checkpoint, or train it if the checkpoint is missing."""
+    if os.path.exists(model_path):
+        print(f"  Loading checkpoint: {model_path}")
+        model.load_state_dict(torch.load(model_path, map_location=device))
+        return model
+
+    if not training_cfg.get("train_if_missing", True):
+        raise FileNotFoundError(
+            f"Checkpoint not found at {model_path!r} "
+            "and train_if_missing is False."
+        )
+
+    print(f"  Checkpoint not found — training model...")
+    model = model.to(device)
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=training_cfg.get("lr", 1e-3),
+        weight_decay=training_cfg.get("weight_decay", 1e-2),
+    )
+    train_model(
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        optimizer=optimizer,
+        loss_fn=torch.nn.CrossEntropyLoss(),
+        device=device,
+        epochs=training_cfg.get("epochs", 50),
+        early_stopping_patience=training_cfg.get("early_stopping_patience", 10),
+        checkpoint_path=model_path,
+    )
+    print(f"  Saved checkpoint: {model_path}")
+    return model
+
+
+# =============================================================================
+# Importance methods dispatcher
+# =============================================================================
+
+def _supports_gradients(model_name: str) -> bool:
+    """ROCKET uses non-differentiable PPV — skip gradient-based methods."""
+    return model_name != "ROCKET"
+
+
+def run_importance_methods(
+    model,
+    test_loader,
+    feature_names,
+    analysis_cfg: dict,
+    device,
+    model_name: str,
+) -> dict:
+    """Run all enabled importance methods and return a results dict."""
+    methods  = analysis_cfg.get("methods", ["permutation"])
+    metric   = analysis_cfg.get("metric", "accuracy")
+    results  = {}
+
+    if "permutation" in methods:
+        print("\n  [Permutation Importance]")
+        results["permutation"] = compute_permutation_importance(
+            model, test_loader, feature_names, device,
+            n_repeats=analysis_cfg.get("n_repeats", 5),
+            metric=metric,
+        )
+
+    if "occlusion" in methods:
+        print("\n  [Occlusion Importance]")
+        results["occlusion"] = compute_occlusion_importance(
+            model, test_loader, feature_names, device,
+            metric=metric,
+        )
+
+    if "integrated_gradients" in methods:
+        if _supports_gradients(model_name):
+            print("\n  [Integrated Gradients]")
+            try:
+                results["integrated_gradients"] = compute_ig_channel_importance(
+                    model, test_loader, feature_names, device,
+                    n_steps=analysis_cfg.get("ig_n_steps", 50),
+                    target_class=analysis_cfg.get("ig_target_class", 1),
+                    n_samples=analysis_cfg.get("ig_n_samples", None),
+                )
+            except Exception as exc:
+                print(f"  [Integrated Gradients] Failed: {exc}")
+        else:
+            print(f"\n  [Integrated Gradients] Skipped — not supported for {model_name}")
+
+    if "shap" in methods:
+        if _supports_gradients(model_name):
+            print("\n  [SHAP]")
+            try:
+                results["shap"] = compute_shap_importance(
+                    model, test_loader, feature_names, device,
+                    n_background=analysis_cfg.get("shap_n_background", 50),
+                    n_samples=analysis_cfg.get("shap_n_samples", 100),
+                    target_class=analysis_cfg.get("shap_target_class", 1),
+                )
+            except Exception as exc:
+                print(f"  [SHAP] Failed: {exc}")
+        else:
+            print(f"\n  [SHAP] Skipped — not supported for {model_name}")
+
+    return results
+
+
+# =============================================================================
+# Aggregation helpers
+# =============================================================================
+
+def aggregate_methods_across_folds(
+    fold_method_results: list,
+) -> dict:
+    """For each method, aggregate importances across folds.
+
+    Returns dict: method_name -> aggregated importance dict
+    (with importances_mean / importances_std / feature_names).
+    """
+    # Collect method names from all folds (some may be missing if a fold failed)
+    all_methods = set()
+    for fold_res in fold_method_results:
+        all_methods.update(fold_res.keys())
+
+    aggregated = {}
+    for method in all_methods:
+        fold_dicts = [
+            fold_res[method]
+            for fold_res in fold_method_results
+            if method in fold_res
+        ]
+        if fold_dicts:
+            aggregated[method] = aggregate_importance_across_folds(fold_dicts)
+
+    return aggregated
+
+
+# =============================================================================
+# Saving helpers
+# =============================================================================
+
+def save_permutation_per_fold(
+    fold_method_results: list,
+    feature_cols: list,
+    save_dir: str,
+    model_name: str,
+):
+    """Write per-fold permutation importance to CSV (for stability analysis)."""
+    per_fold_df = pd.DataFrame({"feature": feature_cols})
+    for fold_idx, fold_res in enumerate(fold_method_results):
+        if "permutation" in fold_res:
+            per_fold_df[f"fold_{fold_idx}_importance"] = (
+                fold_res["permutation"]["importances"]
+            )
+    path = os.path.join(save_dir, f"{model_name}_per_fold_importance.csv")
+    per_fold_df.to_csv(path, index=False)
+    print(f"Saved per-fold permutation results to {path}")
+
+
+def save_stability(
+    fold_method_results: list,
+    feature_cols: list,
+    aggregated_methods: dict,
+    save_dir: str,
+    model_name: str,
+):
+    """Write CV stability analysis (coefficient of variation) to CSV."""
+    if "permutation" not in aggregated_methods:
+        return
+
+    importance_matrix = np.array(
+        [
+            fold_res["permutation"]["importances"]
+            for fold_res in fold_method_results
+            if "permutation" in fold_res
+        ]
+    )
+    stability = 1 - (
+        importance_matrix.std(axis=0)
+        / (importance_matrix.mean(axis=0) + 1e-10)
+    )
+
+    agg = aggregated_methods["permutation"]
+    stability_df = pd.DataFrame(
+        {
+            "feature": feature_cols,
+            "mean_importance": agg["importances_mean"],
+            "std_importance": agg["importances_std"],
+            "stability_score": stability,
+        }
+    ).sort_values("mean_importance", ascending=False)
+
+    path = os.path.join(save_dir, f"{model_name}_stability.csv")
+    stability_df.to_csv(path, index=False)
+    print(f"Saved stability analysis to {path}")
+
+
+# =============================================================================
+# Main
+# =============================================================================
 
 def main():
-    args = parse_args()
+    parser = argparse.ArgumentParser(
+        description="K-fold feature importance analysis (config-driven)"
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="examples/configs/analyze_kfold.yaml",
+        help="Path to YAML configuration file",
+    )
+    args = parser.parse_args()
+
+    cfg = load_config(args.config)
+
+    data_cfg     = cfg["data"]
+    model_cfg    = cfg["model"]
+    training_cfg = cfg["training"]
+    kfold_cfg    = cfg["kfold"]
+    analysis_cfg = cfg["analysis"]
+    groups_cfg   = cfg.get("channel_groups", {})
+    output_cfg   = cfg["output"]
+
+    model_name = model_cfg["name"]
+    n_folds    = kfold_cfg["n_folds"]
+    save_dir   = output_cfg["save_dir"]
+    top_k      = output_cfg.get("top_k", 20)
+    metric     = analysis_cfg.get("metric", "accuracy")
 
     print("=" * 80)
     print("K-Fold Feature Importance Analysis")
     print("=" * 80)
+    print(f"\n  Model      : {model_name}")
+    print(f"  K-folds    : {n_folds}")
+    print(f"  Data root  : {data_cfg['root']}")
+    print(f"  Methods    : {analysis_cfg.get('methods', [])}")
+    print(f"  Save dir   : {save_dir}")
 
-    # -------------------------------------------------------------------------
-    # Configuration
-    # -------------------------------------------------------------------------
-    data_config = DataConfig(
-        root=args.data_root,
-        T=512,
-        batch_size=args.batch_size,
-        seed=args.seed,
-    )
-
-    # Analysis configuration
-    model_name = args.model
-    n_folds = args.n_folds
-    n_repeats = args.n_repeats
-    save_dir = args.save_dir
-    train_if_missing = not args.no_train
-
-    print("\nConfiguration:")
-    print(f"  Model: {model_name}")
-    print(f"  K-folds: {n_folds}")
-    print(f"  Data root: {data_config.root}")
-    print(f"  Permutation repeats per fold: {n_repeats}")
-    print(f"  Train if missing: {train_if_missing}")
-
-    # Create output directory
     os.makedirs(save_dir, exist_ok=True)
 
     # -------------------------------------------------------------------------
-    # Set seed and device
+    # Environment
     # -------------------------------------------------------------------------
-    set_seed(data_config.seed)
-    device = get_device()
-    print(f"\nDevice: {device}")
+    set_seed(data_cfg.get("seed", 42))
+    device = get_device(cfg.get("device", "cuda"))
+    print(f"\n  Device: {device}")
 
     # -------------------------------------------------------------------------
-    # Load data
+    # Data
     # -------------------------------------------------------------------------
     print("\nLoading data...")
-    all_files = list_csvs_by_class(data_config.root)
-    labels = get_file_labels(all_files, data_config.label_map)
-    print(f"Total files: {len(all_files)}")
+    data_config = DataConfig(
+        root=data_cfg["root"],
+        T=data_cfg.get("T", 512),
+        batch_size=data_cfg.get("batch_size", 32),
+        seed=data_cfg.get("seed", 42),
+    )
 
-    # Get feature names and number of input channels
+    all_files = list_csvs_by_class(data_config.root)
+    labels    = get_file_labels(all_files, data_config.label_map)
+    print(f"  Total files: {len(all_files)}")
+
+    # Detect feature columns from first file
     df0 = pd.read_csv(all_files[0])
     id_cols = {"run_id", "cycle", "relative_time_sec", "section", "patient_id"}
-    feature_cols = [c for c in df0.columns if c not in id_cols]
+    feature_cols   = [c for c in df0.columns if c not in id_cols]
     input_channels = len(feature_cols)
-    print(f"Input channels: {input_channels}")
+    print(f"  Input channels: {input_channels}")
+
+    # Identify channel groups for ablation
+    print("\nChannel groups:")
+    group_indices = identify_channel_groups(feature_cols, groups_cfg)
 
     # -------------------------------------------------------------------------
-    # Define model configuration
-    # -------------------------------------------------------------------------
-    model_configs = {
-        "ImprovedCNN1D": {
-            "class": ImprovedCNN1D,
-            "kwargs": {"C": input_channels, "dropout": 0.3},
-            "lr": 1e-3,
-        },
-        "ResNet1D": {
-            "class": ResNet1D,
-            "kwargs": {"input_channels": input_channels, "num_classes": 2, "dropout": 0.5},
-            "lr": 1e-3,
-        },
-        "InceptionTime": {
-            "class": InceptionTime,
-            "kwargs": {
-                "input_channels": input_channels,
-                "num_classes": 2,
-                "n_filters": 32,
-                "depth": 6,
-                "dropout": 0.5,
-            },
-            "lr": 1e-3,
-        },
-        "ROCKET": {
-            "class": RocketClassifier,
-            "kwargs": {
-                "input_channels": input_channels,
-                "num_classes": 2,
-                "num_kernels": 5000,
-                "dropout": 0.5,
-            },
-            "lr": 1e-3,
-        },
-    }
-
-    if model_name not in model_configs:
-        raise ValueError(f"Unknown model: {model_name}")
-
-    config = model_configs[model_name]
-
-    # -------------------------------------------------------------------------
-    # K-Fold Feature Importance
+    # K-Fold loop
     # -------------------------------------------------------------------------
     print(f"\n{'#' * 80}")
-    print(f"# Computing Feature Importance Across {n_folds} Folds")
-    print(f"{'#' * 80}\n")
+    print(f"# K-Fold Analysis ({n_folds} folds)")
+    print(f"{'#' * 80}")
 
-    skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=data_config.seed)
-    fold_results = []
+    skf = StratifiedKFold(
+        n_splits=n_folds,
+        shuffle=True,
+        random_state=data_config.seed,
+    )
 
-    for fold_idx, (train_idx, test_idx) in enumerate(skf.split(all_files, labels)):
+    fold_method_results: list = []   # list of method->result dicts
+    fold_ablation_results: list = [] # list of (results, display_names) tuples
+
+    for fold_idx, (train_idx, test_idx) in enumerate(
+        skf.split(all_files, labels)
+    ):
         print(f"\n{'-' * 80}")
-        print(f"FOLD {fold_idx + 1}/{n_folds}")
+        print(f"FOLD {fold_idx + 1} / {n_folds}")
         print(f"{'-' * 80}")
 
-        # Split files
         train_files = [all_files[i] for i in train_idx]
-        test_files = [all_files[i] for i in test_idx]
-        print(f"Train files: {len(train_files)}, Test files: {len(test_files)}")
+        test_files  = [all_files[i] for i in test_idx]
+        print(f"  Train: {len(train_files)}  Test: {len(test_files)}")
 
-        # Create dataloaders
         train_loader, test_loader = create_dataloaders(
             train_files,
             test_files,
@@ -229,145 +439,184 @@ def main():
             output_format="channels_first",
         )
 
-        # Load or train model for this fold
-        model_path = os.path.join(save_dir, f"{model_name}_fold{fold_idx}.pth")
-
-        model = config["class"](**config["kwargs"])
-
-        if os.path.exists(model_path):
-            print(f"Loading model from {model_path}...")
-            model.load_state_dict(torch.load(model_path, map_location=device))
-        elif train_if_missing:
-            print(f"Training model for fold {fold_idx}...")
-            model = model.to(device)
-            optimizer = torch.optim.AdamW(
-                model.parameters(),
-                lr=config["lr"],
-                weight_decay=1e-2
-            )
-            loss_fn = torch.nn.CrossEntropyLoss()
-
-            history = train_model(
-                model=model,
-                train_loader=train_loader,
-                val_loader=test_loader,
-                optimizer=optimizer,
-                loss_fn=loss_fn,
-                device=device,
-                epochs=args.epochs,
-                early_stopping_patience=10,
-                checkpoint_path=model_path,
-            )
-            print(f"Saved model to {model_path}")
-        else:
-            raise FileNotFoundError(
-                f"Model not found at {model_path} and train_if_missing=False"
-            )
-
+        # Load or train model
+        model_path = os.path.join(
+            save_dir, f"{model_name}_fold{fold_idx}.pth"
+        )
+        model = build_model(model_name, input_channels, model_cfg)
+        model = get_or_train_model(
+            model, model_path, train_loader, test_loader,
+            training_cfg, device,
+        )
         model = model.to(device)
         model.eval()
 
-        # Compute permutation importance for this fold
-        print(f"\nComputing permutation importance for fold {fold_idx}...")
-        perm_results = compute_permutation_importance(
-            model=model,
-            dataloader=test_loader,
-            feature_names=feature_cols,
-            device=str(device),
-            n_repeats=n_repeats,
-            metric="accuracy",
+        # -- Importance methods --
+        print(f"\n  Computing importance methods for fold {fold_idx + 1}...")
+        fold_res = run_importance_methods(
+            model, test_loader, feature_cols, analysis_cfg, device, model_name
         )
+        fold_method_results.append(fold_res)
 
-        fold_results.append(perm_results)
+        # Print top-5 from permutation (quick sanity check)
+        if "permutation" in fold_res:
+            top5 = fold_res["permutation"]["importances"].argsort()[::-1][:5]
+            print(f"\n  Top-5 (permutation):")
+            for rank, idx in enumerate(top5):
+                print(
+                    f"    {rank+1}. {feature_cols[idx]:<30s}"
+                    f" {fold_res['permutation']['importances'][idx]:.4f}"
+                )
 
-        # Print top features for this fold
-        print(f"\nTop 5 features for fold {fold_idx}:")
-        sorted_idx = perm_results["importances"].argsort()[::-1]
-        for i, idx in enumerate(sorted_idx[:5]):
+        # -- Channel ablation --
+        if groups_cfg:
+            print(f"\n  Running channel ablation for fold {fold_idx + 1}...")
+            abl_res, abl_names = run_channel_ablation(
+                model, test_loader, feature_cols,
+                group_indices, groups_cfg, device, metric=metric,
+            )
+            fold_ablation_results.append((abl_res, abl_names))
+
+    # -------------------------------------------------------------------------
+    # Aggregate across folds
+    # -------------------------------------------------------------------------
+    print(f"\n{'#' * 80}")
+    print("# Aggregating Results")
+    print(f"{'#' * 80}\n")
+
+    aggregated_methods = aggregate_methods_across_folds(fold_method_results)
+
+    # -------------------------------------------------------------------------
+    # Print leaderboard (permutation)
+    # -------------------------------------------------------------------------
+    if "permutation" in aggregated_methods:
+        agg_perm = aggregated_methods["permutation"]
+        print("Top 15 features (permutation, mean across folds):")
+        print("-" * 70)
+        top15 = agg_perm["importances_mean"].argsort()[::-1][:15]
+        for rank, idx in enumerate(top15):
             print(
-                f"  {i+1}. {feature_cols[idx]:<30s} "
-                f"{perm_results['importances'][idx]:.4f}"
+                f"  {rank+1:2d}. {feature_cols[idx]:<30s}"
+                f" {agg_perm['importances_mean'][idx]:.4f}"
+                f" ± {agg_perm['importances_std'][idx]:.4f}"
             )
 
     # -------------------------------------------------------------------------
-    # Aggregate Results Across Folds
+    # Spearman comparison between methods
     # -------------------------------------------------------------------------
-    print(f"\n{'#' * 80}")
-    print("# Aggregating Results Across Folds")
-    print(f"{'#' * 80}\n")
-
-    aggregated_results = aggregate_importance_across_folds(fold_results)
-
-    print("Top 15 Most Important Features (Averaged Across Folds):")
-    print("-" * 70)
-    sorted_idx = aggregated_results["importances_mean"].argsort()[::-1]
-    for i, idx in enumerate(sorted_idx[:15]):
-        print(
-            f"{i+1:2d}. {feature_cols[idx]:<30s} "
-            f"{aggregated_results['importances_mean'][idx]:.4f} ± "
-            f"{aggregated_results['importances_std'][idx]:.4f}"
+    if len(aggregated_methods) > 1:
+        print("\nSpearman ρ between importance methods:")
+        corr_matrix, pval_matrix, method_names = compare_importance_methods(
+            aggregated_methods
         )
+        for i, ni in enumerate(method_names):
+            for j, nj in enumerate(method_names):
+                if i < j:
+                    print(
+                        f"  {ni} vs {nj}: ρ = {corr_matrix[i,j]:.3f}"
+                        f"  (p = {pval_matrix[i,j]:.3f})"
+                    )
+    else:
+        corr_matrix = pval_matrix = method_names = None
 
     # -------------------------------------------------------------------------
-    # Visualize and Save Results
+    # Aggregate ablation
+    # -------------------------------------------------------------------------
+    if fold_ablation_results:
+        agg_ablation, abl_display_names = aggregate_ablation_across_folds(
+            fold_ablation_results
+        )
+        print("\nAblation summary (mean ± std across folds):")
+        for cond, (mean, std) in agg_ablation.items():
+            print(
+                f"  {abl_display_names.get(cond, cond):<35s}"
+                f"  {mean:.4f} ± {std:.4f}"
+            )
+    else:
+        agg_ablation = abl_display_names = None
+
+    # -------------------------------------------------------------------------
+    # Save and plot — importance methods
     # -------------------------------------------------------------------------
     print("\nSaving results...")
 
-    # Plot aggregated importance
-    plot_path = os.path.join(save_dir, f"{model_name}_kfold_importance.png")
-    plot_feature_importance(
-        aggregated_results,
-        top_k=20,
-        save_path=plot_path,
-    )
+    prefix = model_name
 
-    # Save to CSV
-    csv_path = os.path.join(save_dir, f"{model_name}_kfold_importance.csv")
-    save_importance_results(aggregated_results, csv_path)
+    # Permutation: aggregated bar chart + CSV
+    if "permutation" in aggregated_methods:
+        agg_perm = aggregated_methods["permutation"]
+        plot_feature_importance(
+            agg_perm,
+            top_k=top_k,
+            save_path=os.path.join(save_dir, f"{prefix}_kfold_importance.png"),
+        )
+        save_importance_results(
+            agg_perm,
+            os.path.join(save_dir, f"{prefix}_kfold_importance.csv"),
+        )
+        save_permutation_per_fold(
+            fold_method_results, feature_cols, save_dir, prefix
+        )
+        save_stability(
+            fold_method_results, feature_cols,
+            aggregated_methods, save_dir, prefix,
+        )
 
-    # Save per-fold results
-    per_fold_df = pd.DataFrame({
-        "feature": feature_cols,
-    })
-    for fold_idx, result in enumerate(fold_results):
-        per_fold_df[f"fold_{fold_idx}_importance"] = result["importances"]
+    # Multi-method side-by-side plot + CSVs
+    if len(aggregated_methods) >= 1:
+        plot_multi_method_importance(
+            aggregated_methods,
+            feature_cols,
+            top_k=top_k,
+            save_path=os.path.join(save_dir, f"{prefix}_all_methods.png"),
+        )
 
-    per_fold_csv = os.path.join(save_dir, f"{model_name}_per_fold_importance.csv")
-    per_fold_df.to_csv(per_fold_csv, index=False)
-    print(f"Saved per-fold results to {per_fold_csv}")
+    if corr_matrix is not None:
+        plot_method_comparison(
+            corr_matrix, pval_matrix, method_names,
+            save_path=os.path.join(
+                save_dir, f"{prefix}_method_corr_heatmap.png"
+            ),
+        )
+        save_method_comparison(
+            aggregated_methods, corr_matrix, pval_matrix,
+            method_names, feature_cols, save_dir, prefix,
+        )
 
-    # Compute stability of feature importance across folds
-    importance_matrix = np.array([r["importances"] for r in fold_results])
-    stability_scores = 1 - (importance_matrix.std(axis=0) /
-                           (importance_matrix.mean(axis=0) + 1e-10))
-
-    stability_df = pd.DataFrame({
-        "feature": feature_cols,
-        "mean_importance": aggregated_results["importances_mean"],
-        "std_importance": aggregated_results["importances_std"],
-        "stability_score": stability_scores,
-    })
-    stability_df = stability_df.sort_values("mean_importance", ascending=False)
-
-    stability_csv = os.path.join(save_dir, f"{model_name}_stability.csv")
-    stability_df.to_csv(stability_csv, index=False)
-    print(f"Saved stability analysis to {stability_csv}")
+    # -------------------------------------------------------------------------
+    # Save and plot — ablation
+    # -------------------------------------------------------------------------
+    if agg_ablation is not None:
+        plot_ablation_results(
+            agg_ablation,
+            abl_display_names,
+            metric=metric,
+            save_path=os.path.join(save_dir, f"{prefix}_ablation.png"),
+        )
+        save_ablation_results(
+            agg_ablation,
+            abl_display_names,
+            feature_cols,
+            group_indices,
+            metric,
+            save_dir,
+            prefix,
+        )
 
     # -------------------------------------------------------------------------
     # Summary
     # -------------------------------------------------------------------------
     print("\n" + "=" * 80)
-    print("K-FOLD ANALYSIS COMPLETE")
+    print("ANALYSIS COMPLETE")
     print("=" * 80)
-    print(f"\nResults saved to: {save_dir}/")
-    print(f"  - Aggregated importance plot: {plot_path}")
-    print(f"  - Aggregated importance CSV: {csv_path}")
-    print(f"  - Per-fold results: {per_fold_csv}")
-    print(f"  - Stability analysis: {stability_csv}")
-    print("\nInterpretation:")
-    print("  - High mean importance = feature is important for predictions")
-    print("  - Low std importance = feature importance is consistent across folds")
-    print("  - High stability score = feature is reliably important (recommended)")
+    print(f"\nAll results saved to: {save_dir}/")
+    print("\nKey output files:")
+    print(f"  {prefix}_all_methods.png          — importance by all methods (side-by-side)")
+    print(f"  {prefix}_method_corr_heatmap.png  — Spearman ρ heatmap")
+    print(f"  {prefix}_method_correlations.csv  — Spearman ρ values")
+    print(f"  {prefix}_kfold_importance.png/csv — permutation importance")
+    print(f"  {prefix}_stability.csv            — CV stability scores")
+    print(f"  {prefix}_ablation.png/csv         — channel group ablation")
 
 
 if __name__ == "__main__":

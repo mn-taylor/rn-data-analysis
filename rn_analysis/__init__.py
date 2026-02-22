@@ -18,6 +18,8 @@ from . import dataloader
 from . import models
 from . import train
 from . import utils
+from . import feature_importance
+from . import channel_ablation
 
 __all__ = [
     "config",
@@ -25,4 +27,6 @@ __all__ = [
     "models",
     "train",
     "utils",
+    "feature_importance",
+    "channel_ablation",
 ]
