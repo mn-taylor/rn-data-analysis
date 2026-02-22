@@ -134,6 +134,57 @@ def compute_auc(
     return roc_auc_score(y_true, y_score)
 
 
+@torch.no_grad()
+def compute_sensitivity_specificity(
+    model: nn.Module,
+    dataloader: DataLoader,
+    device: torch.device,
+    positive_class: int = 1,
+) -> Tuple[float, float]:
+    """Compute sensitivity and specificity.
+
+    Args:
+        model: Neural network model
+        dataloader: Data loader
+        device: Device to evaluate on
+        positive_class: Index of positive class
+
+    Returns:
+        Tuple of (sensitivity, specificity)
+        - Sensitivity (Recall/TPR): TP / (TP + FN)
+        - Specificity (TNR): TN / (TN + FP)
+    """
+    model.eval()
+    y_true = []
+    y_pred = []
+
+    for x, y in dataloader:
+        x = x.to(device)
+        logits = model(x)
+        pred = logits.argmax(dim=1)
+
+        y_true.append(y.cpu().numpy())
+        y_pred.append(pred.cpu().numpy())
+
+    y_true = np.concatenate(y_true)
+    y_pred = np.concatenate(y_pred)
+
+    # Calculate confusion matrix components
+    # Positive class = 1, Negative class = 0
+    tp = np.sum((y_true == positive_class) & (y_pred == positive_class))
+    fn = np.sum((y_true == positive_class) & (y_pred != positive_class))
+    tn = np.sum((y_true != positive_class) & (y_pred != positive_class))
+    fp = np.sum((y_true != positive_class) & (y_pred == positive_class))
+
+    # Sensitivity (TPR) = TP / (TP + FN)
+    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+
+    # Specificity (TNR) = TN / (TN + FP)
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+
+    return sensitivity, specificity
+
+
 def train_model(
     model: nn.Module,
     train_loader: DataLoader,
@@ -310,6 +361,8 @@ def stratified_kfold_cv(
     fold_results = []
     all_aucs = []
     all_best_accs = []
+    all_sensitivities = []
+    all_specificities = []
 
     print(f"Starting {n_folds}-fold stratified cross-validation...")
     print(f"Total samples: {len(files)}, Positive: {y.sum()}, Negative: {len(y) - y.sum()}")
@@ -353,6 +406,8 @@ def stratified_kfold_cv(
         # Training loop with early stopping
         best_val_auc = 0
         best_val_acc = 0
+        best_sensitivity = 0
+        best_specificity = 0
         patience_counter = 0
 
         for epoch in range(1, epochs + 1):
@@ -362,11 +417,14 @@ def stratified_kfold_cv(
             # Validate
             val_loss, val_acc = eval_epoch(model, val_dl, loss_fn, device)
             val_auc = compute_auc(model, val_dl, device)
+            sensitivity, specificity = compute_sensitivity_specificity(model, val_dl, device)
 
             # Early stopping based on AUC
             if val_auc > best_val_auc:
                 best_val_auc = val_auc
                 best_val_acc = val_acc
+                best_sensitivity = sensitivity
+                best_specificity = specificity
                 patience_counter = 0
             else:
                 patience_counter += 1
@@ -374,14 +432,18 @@ def stratified_kfold_cv(
             if epoch % 5 == 0 or epoch == 1:
                 print(
                     f"  Epoch {epoch:02d} | Train Loss: {train_loss:.4f} Acc: {train_acc:.3f} | "
-                    f"Val Loss: {val_loss:.4f} Acc: {val_acc:.3f} AUC: {val_auc:.4f}"
+                    f"Val Loss: {val_loss:.4f} Acc: {val_acc:.3f} AUC: {val_auc:.4f} "
+                    f"Sens: {sensitivity:.3f} Spec: {specificity:.3f}"
                 )
 
             if patience_counter >= early_stopping_patience:
                 print(f"  Early stopping at epoch {epoch}")
                 break
 
-        print(f"  Best Val AUC: {best_val_auc:.4f}, Best Val Acc: {best_val_acc:.4f}")
+        print(
+            f"  Best Val AUC: {best_val_auc:.4f}, Best Val Acc: {best_val_acc:.4f}, "
+            f"Sensitivity: {best_sensitivity:.4f}, Specificity: {best_specificity:.4f}"
+        )
 
         # Store results
         fold_results.append(
@@ -389,12 +451,16 @@ def stratified_kfold_cv(
                 "fold": fold_idx + 1,
                 "best_val_auc": best_val_auc,
                 "best_val_acc": best_val_acc,
+                "best_sensitivity": best_sensitivity,
+                "best_specificity": best_specificity,
                 "train_size": len(train_files),
                 "val_size": len(val_files),
             }
         )
         all_aucs.append(best_val_auc)
         all_best_accs.append(best_val_acc)
+        all_sensitivities.append(best_sensitivity)
+        all_specificities.append(best_specificity)
 
     # Aggregate results
     print("\n" + "=" * 80)
@@ -403,17 +469,25 @@ def stratified_kfold_cv(
     for res in fold_results:
         print(
             f"Fold {res['fold']}: Val AUC = {res['best_val_auc']:.4f}, "
-            f"Val Acc = {res['best_val_acc']:.4f}"
+            f"Val Acc = {res['best_val_acc']:.4f}, "
+            f"Sensitivity = {res['best_sensitivity']:.4f}, "
+            f"Specificity = {res['best_specificity']:.4f}"
         )
 
     mean_auc = np.mean(all_aucs)
     std_auc = np.std(all_aucs)
     mean_acc = np.mean(all_best_accs)
     std_acc = np.std(all_best_accs)
+    mean_sensitivity = np.mean(all_sensitivities)
+    std_sensitivity = np.std(all_sensitivities)
+    mean_specificity = np.mean(all_specificities)
+    std_specificity = np.std(all_specificities)
 
     print("-" * 80)
     print(f"Mean Val AUC: {mean_auc:.4f} ± {std_auc:.4f}")
     print(f"Mean Val Acc: {mean_acc:.4f} ± {std_acc:.4f}")
+    print(f"Mean Sensitivity: {mean_sensitivity:.4f} ± {std_sensitivity:.4f}")
+    print(f"Mean Specificity: {mean_specificity:.4f} ± {std_specificity:.4f}")
     print("=" * 80)
 
     return {
@@ -422,6 +496,12 @@ def stratified_kfold_cv(
         "std_auc": std_auc,
         "mean_acc": mean_acc,
         "std_acc": std_acc,
+        "mean_sensitivity": mean_sensitivity,
+        "std_sensitivity": std_sensitivity,
+        "mean_specificity": mean_specificity,
+        "std_specificity": std_specificity,
         "all_aucs": all_aucs,
         "all_accs": all_best_accs,
+        "all_sensitivities": all_sensitivities,
+        "all_specificities": all_specificities,
     }
