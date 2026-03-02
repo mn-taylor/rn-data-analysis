@@ -23,6 +23,8 @@ Outputs (written to output.save_dir)
   {model}_ablation.png                — channel group ablation bar chart
   {model}_ablation_results.csv        — ablation scores per condition
   {model}_channel_groups.csv          — channel-to-group membership
+  {model}_test_metrics.csv            — per-fold AUC/Acc/Sens/Spec/PPV/Brier
+  {model}_confusion_matrix.png        — aggregated confusion matrix
 """
 
 import sys
@@ -49,8 +51,8 @@ from rn_analysis.models import (
     InceptionTime,
     RocketClassifier,
 )
-from rn_analysis.train import train_model
-from rn_analysis.utils import set_seed, get_device
+from rn_analysis.train import train_model, compute_full_metrics
+from rn_analysis.utils import set_seed, get_device, plot_confusion_matrix
 from rn_analysis.feature_importance import (
     compute_permutation_importance,
     compute_occlusion_importance,
@@ -418,6 +420,7 @@ def main():
 
     fold_method_results: list = []   # list of method->result dicts
     fold_ablation_results: list = [] # list of (results, display_names) tuples
+    fold_metrics_list: list = []     # list of compute_full_metrics dicts
 
     for fold_idx, (train_idx, test_idx) in enumerate(
         skf.split(all_files, labels)
@@ -451,6 +454,21 @@ def main():
         model = model.to(device)
         model.eval()
 
+        # -- Full test-set metrics --
+        print(f"\n  Computing test metrics for fold {fold_idx + 1}...")
+        fold_metrics = compute_full_metrics(model, test_loader, device)
+        fold_metrics_list.append(fold_metrics)
+        print(
+            f"  AUC={fold_metrics['auc']:.4f}  "
+            f"Acc={fold_metrics['accuracy']:.4f}  "
+            f"Sens={fold_metrics['sensitivity']:.4f}  "
+            f"Spec={fold_metrics['specificity']:.4f}  "
+            f"PPV={fold_metrics['ppv']:.4f}  "
+            f"Brier={fold_metrics['brier_score']:.4f}  "
+            f"[TP={fold_metrics['tp']} TN={fold_metrics['tn']} "
+            f"FP={fold_metrics['fp']} FN={fold_metrics['fn']}]"
+        )
+
         # -- Importance methods --
         print(f"\n  Computing importance methods for fold {fold_idx + 1}...")
         fold_res = run_importance_methods(
@@ -476,6 +494,49 @@ def main():
                 group_indices, groups_cfg, device, metric=metric,
             )
             fold_ablation_results.append((abl_res, abl_names))
+
+    # -------------------------------------------------------------------------
+    # Aggregate test metrics across folds
+    # -------------------------------------------------------------------------
+    print(f"\n{'#' * 80}")
+    print("# Test Metrics Summary")
+    print(f"{'#' * 80}\n")
+
+    _metric_keys = ["auc", "accuracy", "sensitivity", "specificity", "ppv", "brier_score"]
+    _metric_labels = ["AUC", "Accuracy", "Sensitivity", "Specificity", "PPV", "Brier Score"]
+
+    print(f"  {'Metric':<14}  {'Mean':>8}  {'Std':>8}")
+    print(f"  {'-'*34}")
+    for key, label in zip(_metric_keys, _metric_labels):
+        vals = [m[key] for m in fold_metrics_list]
+        print(f"  {label:<14}  {np.mean(vals):>8.4f}  {np.std(vals):>8.4f}")
+
+    # Save per-fold metrics to CSV
+    metrics_rows = []
+    for fold_idx, m in enumerate(fold_metrics_list):
+        row = {"fold": fold_idx + 1}
+        for key in _metric_keys:
+            row[key] = m[key]
+        row.update({"tp": m["tp"], "tn": m["tn"], "fp": m["fp"], "fn": m["fn"]})
+        metrics_rows.append(row)
+    # Append summary row
+    summary = {"fold": "mean±std"}
+    for key in _metric_keys:
+        vals = [m[key] for m in fold_metrics_list]
+        summary[key] = f"{np.mean(vals):.4f}±{np.std(vals):.4f}"
+    metrics_rows.append(summary)
+
+    metrics_path = os.path.join(save_dir, f"{prefix}_test_metrics.csv")
+    pd.DataFrame(metrics_rows).to_csv(metrics_path, index=False)
+    print(f"\n  Saved test metrics to {metrics_path}")
+
+    # Aggregated confusion matrix (sum across folds)
+    summed_cm = sum(m["confusion_matrix"] for m in fold_metrics_list)
+    plot_confusion_matrix(
+        summed_cm,
+        title=f"Confusion Matrix — {n_folds}-Fold Aggregate ({model_name})",
+        save_path=os.path.join(save_dir, f"{prefix}_confusion_matrix.png"),
+    )
 
     # -------------------------------------------------------------------------
     # Aggregate across folds

@@ -185,6 +185,65 @@ def compute_sensitivity_specificity(
     return sensitivity, specificity
 
 
+@torch.no_grad()
+def compute_full_metrics(
+    model: nn.Module,
+    dataloader: DataLoader,
+    device: torch.device,
+    positive_class: int = 1,
+) -> Dict[str, Any]:
+    """Compute all classification metrics in a single forward pass.
+
+    Replaces the separate compute_auc / compute_sensitivity_specificity calls
+    and additionally provides PPV, Brier score, and the confusion matrix.
+
+    Args:
+        model: Neural network model
+        dataloader: Data loader (val or test)
+        device: Device to evaluate on
+        positive_class: Index of positive class (default 1)
+
+    Returns:
+        Dict with keys:
+            accuracy, auc, sensitivity, specificity, ppv, brier_score,
+            confusion_matrix (np.array [[TN, FP], [FN, TP]]),
+            tp, tn, fp, fn  (raw integer counts)
+    """
+    from sklearn.metrics import roc_auc_score, brier_score_loss
+
+    model.eval()
+    all_preds, all_labels, all_probs = [], [], []
+
+    for x, y in dataloader:
+        x = x.to(device)
+        logits = model(x)
+        probs = torch.softmax(logits, dim=1)
+        preds = logits.argmax(dim=1)
+        all_preds.append(preds.cpu().numpy())
+        all_labels.append(y.cpu().numpy())
+        all_probs.append(probs[:, positive_class].cpu().numpy())
+
+    y_true = np.concatenate(all_labels)
+    y_pred = np.concatenate(all_preds)
+    y_prob = np.concatenate(all_probs)
+
+    tp = int(np.sum((y_true == positive_class) & (y_pred == positive_class)))
+    fn = int(np.sum((y_true == positive_class) & (y_pred != positive_class)))
+    tn = int(np.sum((y_true != positive_class) & (y_pred != positive_class)))
+    fp = int(np.sum((y_true != positive_class) & (y_pred == positive_class)))
+
+    return {
+        "accuracy":         (tp + tn) / len(y_true),
+        "auc":              roc_auc_score(y_true, y_prob),
+        "sensitivity":      tp / (tp + fn) if (tp + fn) > 0 else 0.0,  # TPR / recall
+        "specificity":      tn / (tn + fp) if (tn + fp) > 0 else 0.0,  # TNR
+        "ppv":              tp / (tp + fp) if (tp + fp) > 0 else 0.0,  # precision
+        "brier_score":      brier_score_loss(y_true, y_prob),           # lower = better
+        "confusion_matrix": np.array([[tn, fp], [fn, tp]]),             # [[TN,FP],[FN,TP]]
+        "tp": tp, "tn": tn, "fp": fp, "fn": fn,
+    }
+
+
 def train_model(
     model: nn.Module,
     train_loader: DataLoader,
@@ -363,6 +422,8 @@ def stratified_kfold_cv(
     all_best_accs = []
     all_sensitivities = []
     all_specificities = []
+    all_ppvs = []
+    all_briers = []
 
     print(f"Starting {n_folds}-fold stratified cross-validation...")
     print(f"Total samples: {len(files)}, Positive: {y.sum()}, Negative: {len(y) - y.sum()}")
@@ -408,23 +469,26 @@ def stratified_kfold_cv(
         best_val_acc = 0
         best_sensitivity = 0
         best_specificity = 0
+        best_ppv = 0
+        best_brier = 1.0
         patience_counter = 0
 
         for epoch in range(1, epochs + 1):
             # Train
             train_loss, train_acc = train_epoch(model, train_dl, optimizer, loss_fn, device)
 
-            # Validate
+            # Validate — single pass for all metrics
             val_loss, val_acc = eval_epoch(model, val_dl, loss_fn, device)
-            val_auc = compute_auc(model, val_dl, device)
-            sensitivity, specificity = compute_sensitivity_specificity(model, val_dl, device)
+            val_metrics = compute_full_metrics(model, val_dl, device)
 
             # Early stopping based on AUC
-            if val_auc > best_val_auc:
-                best_val_auc = val_auc
-                best_val_acc = val_acc
-                best_sensitivity = sensitivity
-                best_specificity = specificity
+            if val_metrics["auc"] > best_val_auc:
+                best_val_auc   = val_metrics["auc"]
+                best_val_acc   = val_metrics["accuracy"]
+                best_sensitivity = val_metrics["sensitivity"]
+                best_specificity = val_metrics["specificity"]
+                best_ppv       = val_metrics["ppv"]
+                best_brier     = val_metrics["brier_score"]
                 patience_counter = 0
             else:
                 patience_counter += 1
@@ -432,8 +496,10 @@ def stratified_kfold_cv(
             if epoch % 5 == 0 or epoch == 1:
                 print(
                     f"  Epoch {epoch:02d} | Train Loss: {train_loss:.4f} Acc: {train_acc:.3f} | "
-                    f"Val Loss: {val_loss:.4f} Acc: {val_acc:.3f} AUC: {val_auc:.4f} "
-                    f"Sens: {sensitivity:.3f} Spec: {specificity:.3f}"
+                    f"Val Loss: {val_loss:.4f} Acc: {val_metrics['accuracy']:.3f} "
+                    f"AUC: {val_metrics['auc']:.4f} "
+                    f"Sens: {val_metrics['sensitivity']:.3f} Spec: {val_metrics['specificity']:.3f} "
+                    f"PPV: {val_metrics['ppv']:.3f} Brier: {val_metrics['brier_score']:.4f}"
                 )
 
             if patience_counter >= early_stopping_patience:
@@ -441,26 +507,31 @@ def stratified_kfold_cv(
                 break
 
         print(
-            f"  Best Val AUC: {best_val_auc:.4f}, Best Val Acc: {best_val_acc:.4f}, "
-            f"Sensitivity: {best_sensitivity:.4f}, Specificity: {best_specificity:.4f}"
+            f"  Best Val AUC: {best_val_auc:.4f}  Acc: {best_val_acc:.4f}  "
+            f"Sens: {best_sensitivity:.4f}  Spec: {best_specificity:.4f}  "
+            f"PPV: {best_ppv:.4f}  Brier: {best_brier:.4f}"
         )
 
         # Store results
         fold_results.append(
             {
-                "fold": fold_idx + 1,
-                "best_val_auc": best_val_auc,
-                "best_val_acc": best_val_acc,
+                "fold":             fold_idx + 1,
+                "best_val_auc":     best_val_auc,
+                "best_val_acc":     best_val_acc,
                 "best_sensitivity": best_sensitivity,
                 "best_specificity": best_specificity,
-                "train_size": len(train_files),
-                "val_size": len(val_files),
+                "best_ppv":         best_ppv,
+                "best_brier":       best_brier,
+                "train_size":       len(train_files),
+                "val_size":         len(val_files),
             }
         )
         all_aucs.append(best_val_auc)
         all_best_accs.append(best_val_acc)
         all_sensitivities.append(best_sensitivity)
         all_specificities.append(best_specificity)
+        all_ppvs.append(best_ppv)
+        all_briers.append(best_brier)
 
     # Aggregate results
     print("\n" + "=" * 80)
@@ -468,40 +539,46 @@ def stratified_kfold_cv(
     print("=" * 80)
     for res in fold_results:
         print(
-            f"Fold {res['fold']}: Val AUC = {res['best_val_auc']:.4f}, "
-            f"Val Acc = {res['best_val_acc']:.4f}, "
-            f"Sensitivity = {res['best_sensitivity']:.4f}, "
-            f"Specificity = {res['best_specificity']:.4f}"
+            f"Fold {res['fold']}: AUC={res['best_val_auc']:.4f}  "
+            f"Acc={res['best_val_acc']:.4f}  "
+            f"Sens={res['best_sensitivity']:.4f}  Spec={res['best_specificity']:.4f}  "
+            f"PPV={res['best_ppv']:.4f}  Brier={res['best_brier']:.4f}"
         )
 
-    mean_auc = np.mean(all_aucs)
-    std_auc = np.std(all_aucs)
-    mean_acc = np.mean(all_best_accs)
-    std_acc = np.std(all_best_accs)
+    mean_auc         = np.mean(all_aucs)
+    std_auc          = np.std(all_aucs)
+    mean_acc         = np.mean(all_best_accs)
+    std_acc          = np.std(all_best_accs)
     mean_sensitivity = np.mean(all_sensitivities)
-    std_sensitivity = np.std(all_sensitivities)
+    std_sensitivity  = np.std(all_sensitivities)
     mean_specificity = np.mean(all_specificities)
-    std_specificity = np.std(all_specificities)
+    std_specificity  = np.std(all_specificities)
+    mean_ppv         = np.mean(all_ppvs)
+    std_ppv          = np.std(all_ppvs)
+    mean_brier       = np.mean(all_briers)
+    std_brier        = np.std(all_briers)
 
     print("-" * 80)
-    print(f"Mean Val AUC: {mean_auc:.4f} ± {std_auc:.4f}")
-    print(f"Mean Val Acc: {mean_acc:.4f} ± {std_acc:.4f}")
+    print(f"Mean AUC:         {mean_auc:.4f} ± {std_auc:.4f}")
+    print(f"Mean Accuracy:    {mean_acc:.4f} ± {std_acc:.4f}")
     print(f"Mean Sensitivity: {mean_sensitivity:.4f} ± {std_sensitivity:.4f}")
     print(f"Mean Specificity: {mean_specificity:.4f} ± {std_specificity:.4f}")
+    print(f"Mean PPV:         {mean_ppv:.4f} ± {std_ppv:.4f}")
+    print(f"Mean Brier Score: {mean_brier:.4f} ± {std_brier:.4f}")
     print("=" * 80)
 
     return {
-        "fold_results": fold_results,
-        "mean_auc": mean_auc,
-        "std_auc": std_auc,
-        "mean_acc": mean_acc,
-        "std_acc": std_acc,
-        "mean_sensitivity": mean_sensitivity,
-        "std_sensitivity": std_sensitivity,
-        "mean_specificity": mean_specificity,
-        "std_specificity": std_specificity,
-        "all_aucs": all_aucs,
-        "all_accs": all_best_accs,
+        "fold_results":      fold_results,
+        "mean_auc":          mean_auc,   "std_auc":          std_auc,
+        "mean_acc":          mean_acc,   "std_acc":          std_acc,
+        "mean_sensitivity":  mean_sensitivity, "std_sensitivity":  std_sensitivity,
+        "mean_specificity":  mean_specificity, "std_specificity":  std_specificity,
+        "mean_ppv":          mean_ppv,   "std_ppv":          std_ppv,
+        "mean_brier":        mean_brier, "std_brier":        std_brier,
+        "all_aucs":          all_aucs,
+        "all_accs":          all_best_accs,
         "all_sensitivities": all_sensitivities,
         "all_specificities": all_specificities,
+        "all_ppvs":          all_ppvs,
+        "all_briers":        all_briers,
     }

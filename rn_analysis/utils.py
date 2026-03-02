@@ -205,3 +205,51 @@ def count_parameters(model: torch.nn.Module) -> int:
         Number of trainable parameters
     """
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def plot_confusion_matrix(
+    cm,
+    labels=("CONTROL", "POSITIVE"),
+    title: str = "Confusion Matrix",
+    save_path: Optional[str] = None,
+):
+    """Plot a 2×2 confusion matrix with cell annotations.
+
+    Args:
+        cm: np.array of shape (2, 2) in [[TN, FP], [FN, TP]] layout,
+            as returned by ``compute_full_metrics``.
+        labels: Tuple of (negative_label, positive_label).
+        title: Figure title.
+        save_path: Path to save the figure (None = show interactively).
+    """
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(4, 3.5))
+    im = ax.imshow(cm, cmap="Blues")
+
+    ax.set_xticks([0, 1])
+    ax.set_yticks([0, 1])
+    ax.set_xticklabels(labels)
+    ax.set_yticklabels(labels)
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Actual")
+    ax.set_title(title)
+
+    thresh = cm.max() / 2.0
+    for i in range(2):
+        for j in range(2):
+            ax.text(
+                j, i, str(int(cm[i, j])),
+                ha="center", va="center", fontsize=13,
+                color="white" if cm[i, j] > thresh else "black",
+            )
+
+    plt.colorbar(im, ax=ax)
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        print(f"Saved confusion matrix to {save_path}")
+        plt.close()
+    else:
+        plt.show()
