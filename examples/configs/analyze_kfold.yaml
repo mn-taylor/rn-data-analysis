@@ -8,7 +8,7 @@
 # -----------------------------------------------------------------------------
 # Device
 # -----------------------------------------------------------------------------
-device: cuda      # cuda | cpu | mps
+device: cuda:6      # cuda | cpu | mps
 
 
 # -----------------------------------------------------------------------------
@@ -102,5 +102,5 @@ channel_groups:
 # Output
 # -----------------------------------------------------------------------------
 output:
-  save_dir: feature_analysis_kfold   # directory for all results
+  save_dir: data/feature_analysis_kfold   # directory for all results
   top_k: 20                          # number of top features to show in plots
