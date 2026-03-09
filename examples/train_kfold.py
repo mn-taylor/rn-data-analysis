@@ -1,230 +1,303 @@
 """
-Example: K-fold cross-validation with multiple models.
+K-fold training — config-driven entry point.
 
-This script demonstrates using stratified k-fold cross-validation to
-evaluate and compare different model architectures.
+Trains one model checkpoint per fold and evaluates it on the held-out test
+set, reporting all classification metrics.  Fold assignments are loaded from
+a pre-generated folds_meta.json (created by create_folds.py) so that training
+and analysis always use exactly the same splits.
+
+Usage
+-----
+    python examples/train_kfold.py \\
+        --config  examples/configs/analyze_kfold.yaml \\
+        --folds-meta folds_meta.json
+
+Outputs (written to output.save_dir)
+-------------------------------------
+  {model}_fold{k}.pth          — per-fold model checkpoint
+  {model}_train_metrics.csv    — per-fold test metrics table
+  {model}_train_summary.json   — full results summary (JSON)
+  {model}_confusion_matrix.png — aggregated confusion matrix
 """
 
 import sys
 import os
-
-# Add parent directory to path to import rn_analysis
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import torch
 import json
+import argparse
 from datetime import datetime
 
-from rn_analysis.config import DataConfig
-from rn_analysis.dataloader import list_csvs_by_class
-from rn_analysis.models import ImprovedCNN1D, ResNet1D, InceptionTime, RocketClassifier
-from rn_analysis.train import stratified_kfold_cv
-from rn_analysis.utils import set_seed, get_device, plot_kfold_results
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import yaml
+import torch
+import pandas as pd
+import numpy as np
+
+from scripts.utils.config import DataConfig
+from scripts.dataloaders.dataloader import create_dataloaders
+from scripts.models import (
+    ImprovedCNN1D,
+    ResNet1D,
+    InceptionTime,
+    RocketClassifier,
+)
+from scripts.train import train_model, compute_full_metrics
+from scripts.utils.utils import set_seed, get_device, plot_confusion_matrix
+
+
+# =============================================================================
+# Helpers
+# =============================================================================
+
+def load_config(path: str) -> dict:
+    with open(path) as f:
+        return yaml.safe_load(f)
+
+
+def load_folds_meta(path: str) -> dict:
+    with open(path) as f:
+        return json.load(f)
+
+
+def build_model(model_name: str, input_channels: int, model_cfg: dict):
+    dropout = model_cfg.get("dropout", 0.3)
+    if model_name == "ImprovedCNN1D":
+        return ImprovedCNN1D(C=input_channels, dropout=dropout)
+    elif model_name == "ResNet1D":
+        return ResNet1D(input_channels=input_channels, num_classes=2, dropout=dropout)
+    elif model_name == "InceptionTime":
+        return InceptionTime(
+            input_channels=input_channels, num_classes=2,
+            n_filters=model_cfg.get("n_filters", 32),
+            depth=model_cfg.get("depth", 6),
+            dropout=dropout,
+        )
+    elif model_name == "ROCKET":
+        return RocketClassifier(
+            input_channels=input_channels, num_classes=2,
+            num_kernels=model_cfg.get("num_kernels", 5000),
+            dropout=dropout,
+        )
+    else:
+        raise ValueError(f"Unknown model: {model_name!r}")
+
+
+# =============================================================================
+# Main
+# =============================================================================
 
 def main():
-    print("=" * 80)
-    print("K-Fold Cross-Validation: Model Comparison")
-    print("=" * 80)
+    parser = argparse.ArgumentParser(description="K-fold training (config-driven)")
+    parser.add_argument(
+        "--config", type=str, default="examples/configs/analyze_kfold.yaml",
+        help="Path to YAML configuration file",
+    )
+    parser.add_argument(
+        "--folds-meta", type=str, required=True,
+        help="Path to folds_meta.json produced by create_folds.py",
+    )
+    parser.add_argument(
+        "--model", type=str, default=None,
+        help="Override model name from config (ImprovedCNN1D | ResNet1D | InceptionTime | ROCKET)",
+    )
+    parser.add_argument(
+        "--run-save-dir", type=str, default=None,
+        help="Explicit output directory for this run. "
+             "If omitted, auto-generates results_root/{model}/{model}_run_{timestamp}/",
+    )
+    args = parser.parse_args()
 
-    # -------------------------------------------------------------------------
-    # Configuration
-    # -------------------------------------------------------------------------
+    cfg        = load_config(args.config)
+    folds_meta = load_folds_meta(args.folds_meta)
+
+    data_cfg     = cfg["data"]
+    model_cfg    = cfg["model"]
+    training_cfg = cfg["training"]
+    output_cfg   = cfg["output"]
+
+    # CLI --model overrides the config value
+    if args.model is not None:
+        model_cfg = dict(model_cfg)
+        model_cfg["name"] = args.model
+
+    model_name = model_cfg["name"]
+    n_folds    = folds_meta["config"]["n_folds"]
+
+    # Resolve output directory
+    if args.run_save_dir is not None:
+        save_dir = args.run_save_dir
+    else:
+        results_root = output_cfg.get("results_root", "results")
+        timestamp    = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_dir     = os.path.join(results_root, model_name, f"{model_name}_run_{timestamp}")
+
+    print("=" * 80)
+    print("K-Fold Training")
+    print("=" * 80)
+    print(f"\n  Model      : {model_name}")
+    print(f"  K-folds    : {n_folds}")
+    print(f"  Folds meta : {args.folds_meta}")
+    print(f"  Data root  : {data_cfg['root']}")
+    print(f"  Run dir    : {save_dir}")
+
+    os.makedirs(save_dir, exist_ok=True)
+
+    set_seed(data_cfg.get("seed", 42))
+    device = get_device(cfg.get("device", "cuda"))
+    print(f"\n  Device: {device}")
+
+    # Detect input channels from first file in fold 0
+    first_file = folds_meta["folds"][0]["train"]["files"][0]
+    df0 = pd.read_csv(first_file)
+    id_cols = {"run_id", "cycle", "relative_time_sec", "section", "patient_id"}
+    feature_cols   = [c for c in df0.columns if c not in id_cols]
+    input_channels = len(feature_cols)
+    print(f"  Input channels: {input_channels}")
+
+    label_map   = folds_meta["label_map"]
     data_config = DataConfig(
-        root="data",
-        T=512,
-        batch_size=32,
-        seed=144,
+        root=data_cfg["root"],
+        T=data_cfg.get("T", 512),
+        batch_size=data_cfg.get("batch_size", 32),
+        seed=data_cfg.get("seed", 42),
+        label_map=label_map,
     )
 
-    # K-fold parameters
-    n_folds = 5
-    epochs = 50
-    early_stopping_patience = 10
-
-    print("\nData Config:")
-    print(f"  Root: {data_config.root}")
-    print(f"  T: {data_config.T}")
-    print(f"  Batch size: {data_config.batch_size}")
-    print(f"  K-folds: {n_folds}")
-    print(f"  Max epochs per fold: {epochs}")
-
     # -------------------------------------------------------------------------
-    # Set seed and device
+    # K-Fold training loop
     # -------------------------------------------------------------------------
-    set_seed(data_config.seed)
-    device = get_device()
-    print(f"\nDevice: {device}")
+    fold_metrics_list = []
+    _metric_keys = ["auc", "accuracy", "sensitivity", "specificity", "ppv", "brier_score"]
 
-    # -------------------------------------------------------------------------
-    # Load data
-    # -------------------------------------------------------------------------
-    print("\nLoading data...")
-    all_files = list_csvs_by_class(data_config.root)
-    print(f"Total files: {len(all_files)}")
+    for fold_entry in folds_meta["folds"]:
+        fold_idx    = fold_entry["fold"] - 1
+        train_files = fold_entry["train"]["files"]
+        test_files  = fold_entry["test"]["files"]
 
-    # Get number of input channels from first file
-    import pandas as pd
-    df0 = pd.read_csv(all_files[0])
-    id_cols = {"run_id", "cycle", "relative_time_sec", "section", "patient_id"}
-    feature_cols = [c for c in df0.columns if c not in id_cols]
-    input_channels = len(feature_cols)
-    print(f"Input channels: {input_channels}")
+        print(f"\n{'-' * 80}")
+        print(f"FOLD {fold_idx + 1} / {n_folds}")
+        print(f"{'-' * 80}")
+        print(f"  Train: {len(train_files)}  {fold_entry['train']['counts']}")
+        print(f"  Test : {len(test_files)}   {fold_entry['test']['counts']}")
 
-    # -------------------------------------------------------------------------
-    # Define models to evaluate
-    # -------------------------------------------------------------------------
-    model_configs = {
-        # "ImprovedCNN1D": {
-        #     "class": ImprovedCNN1D,
-        #     "kwargs": {"C": input_channels, "dropout": 0.3},
-        #     "lr": 1e-3,
-        #     "batch_size": 32,
-        # },
-        # "ResNet1D": {
-        #     "class": ResNet1D,
-        #     "kwargs": {"input_channels": input_channels, "num_classes": 2, "dropout": 0.5},
-        #     "lr": 1e-3,
-        #     "batch_size": 32,
-        # },
-        # "InceptionTime": {
-        #     "class": InceptionTime,
-        #     "kwargs": {
-        #         "input_channels": input_channels,
-        #         "num_classes": 2,
-        #         "n_filters": 32,
-        #         "depth": 6,
-        #         "dropout": 0.5,
-        #     },
-        #     "lr": 1e-3,
-        #     "batch_size": 32,
-        # },
-        "ROCKET": {
-            "class": RocketClassifier,
-            "kwargs": {
-                "input_channels": input_channels,
-                "num_classes": 2,
-                "num_kernels": 5000,
-                "dropout": 0.2,
-            },
-            "lr": 5e-4,
-            "batch_size": 32,
-        },
-    }
-
-    print("\nModels to evaluate:")
-    for name in model_configs.keys():
-        print(f"  - {name}")
-
-    # -------------------------------------------------------------------------
-    # Run K-Fold CV for each model
-    # -------------------------------------------------------------------------
-    all_results = {}
-
-    for model_name, config in model_configs.items():
-        print(f"\n{'#' * 80}")
-        print(f"# Evaluating: {model_name}")
-        print(f"{'#' * 80}\n")
-
-        results = stratified_kfold_cv(
-            model_class=config["class"],
-            model_kwargs=config["kwargs"],
-            files=all_files,
+        train_loader, test_loader = create_dataloaders(
+            train_files, test_files,
             label_map=data_config.label_map,
-            n_folds=n_folds,
             T=data_config.T,
-            batch_size=config["batch_size"],
-            epochs=epochs,
-            lr=config["lr"],
-            weight_decay=1e-2,
-            device=str(device),
-            seed=data_config.seed,
-            early_stopping_patience=early_stopping_patience,
+            batch_size=data_config.batch_size,
             output_format="channels_first",
         )
 
-        all_results[model_name] = results
+        model_path = os.path.join(save_dir, f"{model_name}_fold{fold_idx}.pth")
+        model      = build_model(model_name, input_channels, model_cfg)
 
-        # Plot results for this model
-        try:
-            print(f"\nPlotting results for {model_name}...")
-            plot_kfold_results(results)
-        except Exception as e:
-            print(f"Could not plot results: {e}")
+        if os.path.exists(model_path):
+            print(f"  Loading existing checkpoint: {model_path}")
+            model.load_state_dict(torch.load(model_path, map_location=device))
+        else:
+            print(f"  Training from scratch...")
+            model = model.to(device)
+            optimizer = torch.optim.AdamW(
+                model.parameters(),
+                lr=training_cfg.get("lr", 1e-3),
+                weight_decay=training_cfg.get("weight_decay", 1e-2),
+            )
+            train_model(
+                model=model,
+                train_loader=train_loader,
+                val_loader=test_loader,
+                optimizer=optimizer,
+                loss_fn=torch.nn.CrossEntropyLoss(),
+                device=device,
+                epochs=training_cfg.get("epochs", 50),
+                early_stopping_patience=training_cfg.get("early_stopping_patience", 10),
+                checkpoint_path=model_path,
+            )
+            print(f"  Saved checkpoint: {model_path}")
 
-    # -------------------------------------------------------------------------
-    # Compare all models
-    # -------------------------------------------------------------------------
-    print("\n" + "=" * 80)
-    print("FINAL COMPARISON - ALL MODELS")
-    print("=" * 80)
-    print(f"{'Model':<20} {'Mean AUC':<15} {'Mean Acc':<15} {'Mean Sens':<15} {'Mean Spec':<15}")
-    print("-" * 80)
+        model = model.to(device)
+        model.eval()
 
-    for model_name, results in all_results.items():
+        metrics = compute_full_metrics(model, test_loader, device)
+        fold_metrics_list.append(metrics)
+
         print(
-            f"{model_name:<20} "
-            f"{results['mean_auc']:.4f} ± {results['std_auc']:.4f}   "
-            f"{results['mean_acc']:.4f} ± {results['std_acc']:.4f}   "
-            f"{results['mean_sensitivity']:.4f} ± {results['std_sensitivity']:.4f}   "
-            f"{results['mean_specificity']:.4f} ± {results['std_specificity']:.4f}"
+            f"\n  AUC={metrics['auc']:.4f}  Acc={metrics['accuracy']:.4f}  "
+            f"Sens={metrics['sensitivity']:.4f}  Spec={metrics['specificity']:.4f}  "
+            f"PPV={metrics['ppv']:.4f}  Brier={metrics['brier_score']:.4f}"
+        )
+        print(
+            f"  TP={metrics['tp']}  TN={metrics['tn']}  "
+            f"FP={metrics['fp']}  FN={metrics['fn']}"
         )
 
-    # Find best model by AUC
-    best_model = max(all_results.items(), key=lambda x: x[1]["mean_auc"])
+    # -------------------------------------------------------------------------
+    # Aggregate and print summary
+    # -------------------------------------------------------------------------
+    print("\n" + "=" * 80)
+    print("CROSS-VALIDATION RESULTS")
     print("=" * 80)
-    print(f"BEST MODEL: {best_model[0]} (Mean AUC: {best_model[1]['mean_auc']:.4f})")
-    print("=" * 80)
+    print(f"\n  {'Metric':<14}  {'Mean':>8}  {'Std':>8}")
+    print(f"  {'-'*34}")
+    metric_labels = ["AUC", "Accuracy", "Sensitivity", "Specificity", "PPV", "Brier Score"]
+    for key, label in zip(_metric_keys, metric_labels):
+        vals = [m[key] for m in fold_metrics_list]
+        print(f"  {label:<14}  {np.mean(vals):>8.4f}  {np.std(vals):>8.4f}")
 
     # -------------------------------------------------------------------------
-    # Save results to JSON file
+    # Save per-fold metrics CSV
     # -------------------------------------------------------------------------
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    results_file = f"kfold_results_{timestamp}.json"
+    rows = []
+    for fold_idx, m in enumerate(fold_metrics_list):
+        row = {"fold": fold_idx + 1}
+        for key in _metric_keys:
+            row[key] = m[key]
+        row.update({"tp": m["tp"], "tn": m["tn"], "fp": m["fp"], "fn": m["fn"]})
+        rows.append(row)
 
-    # Prepare results for JSON serialization
-    results_to_save = {
-        "timestamp": timestamp,
-        "config": {
-            "n_folds": n_folds,
-            "epochs": epochs,
-            "early_stopping_patience": early_stopping_patience,
-            "data_config": {
-                "root": data_config.root,
-                "T": data_config.T,
-                "batch_size": data_config.batch_size,
-                "seed": data_config.seed,
+    summary_row = {"fold": "mean±std"}
+    for key in _metric_keys:
+        vals = [m[key] for m in fold_metrics_list]
+        summary_row[key] = f"{np.mean(vals):.4f}±{np.std(vals):.4f}"
+    rows.append(summary_row)
+
+    csv_path = os.path.join(save_dir, f"{model_name}_train_metrics.csv")
+    pd.DataFrame(rows).to_csv(csv_path, index=False)
+    print(f"\n  Saved metrics table  : {csv_path}")
+
+    # -------------------------------------------------------------------------
+    # Save results JSON
+    # -------------------------------------------------------------------------
+    summed_cm = sum(m["confusion_matrix"] for m in fold_metrics_list)
+    results_summary = {
+        "model":      model_name,
+        "n_folds":    n_folds,
+        "folds_meta": args.folds_meta,
+        "metric_summary": {
+            key: {
+                "mean":     float(np.mean([m[key] for m in fold_metrics_list])),
+                "std":      float(np.std( [m[key] for m in fold_metrics_list])),
+                "per_fold": [float(m[key]) for m in fold_metrics_list],
             }
+            for key in _metric_keys
         },
-        "models": {}
+        "confusion_matrix_sum": summed_cm.tolist(),
     }
+    json_path = os.path.join(save_dir, f"{model_name}_train_summary.json")
+    with open(json_path, "w") as f:
+        json.dump(results_summary, f, indent=2)
+    print(f"  Saved results summary: {json_path}")
 
-    for model_name, results in all_results.items():
-        results_to_save["models"][model_name] = {
-            "mean_auc": float(results["mean_auc"]),
-            "std_auc": float(results["std_auc"]),
-            "mean_acc": float(results["mean_acc"]),
-            "std_acc": float(results["std_acc"]),
-            "mean_sensitivity": float(results["mean_sensitivity"]),
-            "std_sensitivity": float(results["std_sensitivity"]),
-            "mean_specificity": float(results["mean_specificity"]),
-            "std_specificity": float(results["std_specificity"]),
-            "all_aucs": [float(x) for x in results["all_aucs"]],
-            "all_accs": [float(x) for x in results["all_accs"]],
-            "all_sensitivities": [float(x) for x in results["all_sensitivities"]],
-            "all_specificities": [float(x) for x in results["all_specificities"]],
-            "fold_results": results["fold_results"]
-        }
+    # -------------------------------------------------------------------------
+    # Confusion matrix plot
+    # -------------------------------------------------------------------------
+    plot_confusion_matrix(
+        summed_cm,
+        title=f"Confusion Matrix — {n_folds}-Fold ({model_name})",
+        save_path=os.path.join(save_dir, f"{model_name}_confusion_matrix.png"),
+    )
 
-    results_to_save["best_model"] = {
-        "name": best_model[0],
-        "mean_auc": float(best_model[1]["mean_auc"])
-    }
-
-    with open(results_file, 'w') as f:
-        json.dump(results_to_save, f, indent=2)
-
-    print(f"\nResults saved to: {results_file}")
+    print(f"\nAll outputs saved to: {save_dir}/")
 
 
 if __name__ == "__main__":

@@ -8,11 +8,11 @@ explore sensor data.
 import sys
 import os
 
-# Add parent directory to path to import rn_analysis
+# Add parent directory to path to import scripts
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from rn_analysis.dataloader import list_csvs_by_class
-from rn_analysis.utils import visualize_run_cycle_csv
+from scripts.dataloaders.dataloader import list_csvs_by_class
+from scripts.utils.utils import visualize_run_cycle_csv
 
 
 def main():

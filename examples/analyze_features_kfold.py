@@ -33,27 +33,30 @@ import argparse
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import json
 import yaml
 import torch
 import pandas as pd
 import numpy as np
+from collections import Counter
+from datetime import datetime
 from sklearn.model_selection import StratifiedKFold
 
-from rn_analysis.config import DataConfig
-from rn_analysis.dataloader import (
+from scripts.utils.config import DataConfig
+from scripts.dataloaders.dataloader import (
+    create_dataloaders,
     list_csvs_by_class,
     get_file_labels,
-    create_dataloaders,
 )
-from rn_analysis.models import (
+from scripts.models import (
     ImprovedCNN1D,
     ResNet1D,
     InceptionTime,
     RocketClassifier,
 )
-from rn_analysis.train import train_model, compute_full_metrics
-from rn_analysis.utils import set_seed, get_device, plot_confusion_matrix
-from rn_analysis.feature_importance import (
+from scripts.train import train_model, compute_full_metrics
+from scripts.utils.utils import set_seed, get_device, plot_confusion_matrix
+from scripts.interpretability.feature_importance import (
     compute_permutation_importance,
     compute_occlusion_importance,
     compute_ig_channel_importance,
@@ -66,7 +69,7 @@ from rn_analysis.feature_importance import (
     save_importance_results,
     save_method_comparison,
 )
-from rn_analysis.channel_ablation import (
+from scripts.interpretability.channel_ablation import (
     identify_channel_groups,
     run_channel_ablation,
     aggregate_ablation_across_folds,
@@ -333,6 +336,11 @@ def save_stability(
 # Main
 # =============================================================================
 
+def load_folds_meta(path: str) -> dict:
+    with open(path) as f:
+        return json.load(f)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="K-fold feature importance analysis (config-driven)"
@@ -343,32 +351,109 @@ def main():
         default="examples/configs/analyze_kfold.yaml",
         help="Path to YAML configuration file",
     )
+    parser.add_argument(
+        "--folds-meta",
+        type=str,
+        default=None,
+        help="Path to folds_meta.json produced by create_folds.py. "
+             "If omitted, folds are created on the fly from the data root in the config.",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Override model name from config (ImprovedCNN1D | ResNet1D | InceptionTime | ROCKET)",
+    )
+    parser.add_argument(
+        "--run-save-dir",
+        type=str,
+        default=None,
+        help="Explicit output directory for this run (checkpoints + analysis outputs). "
+             "If omitted, auto-generates results_root/{model}/{model}_run_{timestamp}/",
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config)
 
+    # -------------------------------------------------------------------------
+    # Load or create fold splits
+    # -------------------------------------------------------------------------
+    if args.folds_meta is not None:
+        print(f"\nLoading fold splits from: {args.folds_meta}")
+        folds_meta = load_folds_meta(args.folds_meta)
+        print(f"  Loaded {folds_meta['config']['n_folds']}-fold splits "
+              f"(created: {folds_meta.get('created', 'unknown')})")
+    else:
+        print("\nNo folds meta provided — creating folds on the fly...")
+        data_cfg_tmp  = cfg["data"]
+        kfold_cfg_tmp = cfg["kfold"]
+        n_folds_tmp   = kfold_cfg_tmp["n_folds"]
+        seed_tmp      = data_cfg_tmp.get("seed", 42)
+        label_map_tmp = {"CONTROL": 0, "POSITIVE": 1}
+        inv_label_map = {v: k for k, v in label_map_tmp.items()}
+
+        all_files_tmp = list_csvs_by_class(data_cfg_tmp["root"])
+        labels_tmp    = get_file_labels(all_files_tmp, label_map_tmp)
+        print(f"  Found {len(all_files_tmp)} files  "
+              f"{dict(Counter(inv_label_map[l] for l in labels_tmp))}")
+
+        skf_tmp = StratifiedKFold(n_splits=n_folds_tmp, shuffle=True, random_state=seed_tmp)
+        folds_tmp = []
+        for fold_idx, (train_idx, test_idx) in enumerate(skf_tmp.split(all_files_tmp, labels_tmp)):
+            train_files_t  = [all_files_tmp[i] for i in train_idx]
+            test_files_t   = [all_files_tmp[i] for i in test_idx]
+            train_counts_t = dict(Counter(inv_label_map[labels_tmp[i]] for i in train_idx))
+            test_counts_t  = dict(Counter(inv_label_map[labels_tmp[i]] for i in test_idx))
+            folds_tmp.append({
+                "fold":  fold_idx + 1,
+                "train": {"files": train_files_t, "counts": train_counts_t, "total": len(train_files_t)},
+                "test":  {"files": test_files_t,  "counts": test_counts_t,  "total": len(test_files_t)},
+            })
+
+        folds_meta = {
+            "created": "on-the-fly",
+            "config":  {"n_folds": n_folds_tmp, "seed": seed_tmp},
+            "label_map":      label_map_tmp,
+            "total_files":    len(all_files_tmp),
+            "overall_counts": dict(Counter(inv_label_map[l] for l in labels_tmp)),
+            "folds":          folds_tmp,
+        }
+        print(f"  Created {n_folds_tmp} folds on the fly (seed={seed_tmp})")
+
     data_cfg     = cfg["data"]
     model_cfg    = cfg["model"]
     training_cfg = cfg["training"]
-    kfold_cfg    = cfg["kfold"]
     analysis_cfg = cfg["analysis"]
     groups_cfg   = cfg.get("channel_groups", {})
     output_cfg   = cfg["output"]
 
+    # CLI --model overrides the config value
+    if args.model is not None:
+        model_cfg = dict(model_cfg)
+        model_cfg["name"] = args.model
+
     model_name = model_cfg["name"]
-    n_folds    = kfold_cfg["n_folds"]
-    save_dir   = output_cfg["save_dir"]
+    n_folds    = folds_meta["config"]["n_folds"]
     top_k      = output_cfg.get("top_k", 20)
     metric     = analysis_cfg.get("metric", "accuracy")
+
+    # Resolve output directory (checkpoints + all analysis outputs live here)
+    if args.run_save_dir is not None:
+        save_dir = args.run_save_dir
+    else:
+        results_root = output_cfg.get("results_root", "results")
+        timestamp    = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_dir     = os.path.join(results_root, model_name, f"{model_name}_run_{timestamp}")
 
     print("=" * 80)
     print("K-Fold Feature Importance Analysis")
     print("=" * 80)
     print(f"\n  Model      : {model_name}")
     print(f"  K-folds    : {n_folds}")
+    print(f"  Folds meta : {args.folds_meta or '(on the fly)'}")
     print(f"  Data root  : {data_cfg['root']}")
     print(f"  Methods    : {analysis_cfg.get('methods', [])}")
-    print(f"  Save dir   : {save_dir}")
+    print(f"  Run dir    : {save_dir}")
 
     os.makedirs(save_dir, exist_ok=True)
 
@@ -390,16 +475,14 @@ def main():
         seed=data_cfg.get("seed", 42),
     )
 
-    all_files = list_csvs_by_class(data_config.root)
-    labels    = get_file_labels(all_files, data_config.label_map)
-    print(f"  Total files: {len(all_files)}")
-
-    # Detect feature columns from first file
-    df0 = pd.read_csv(all_files[0])
+    # Detect feature columns from first train file in fold 0
+    first_file = folds_meta["folds"][0]["train"]["files"][0]
+    df0 = pd.read_csv(first_file)
     id_cols = {"run_id", "cycle", "relative_time_sec", "section", "patient_id"}
     feature_cols   = [c for c in df0.columns if c not in id_cols]
     input_channels = len(feature_cols)
     print(f"  Input channels: {input_channels}")
+    print(f"  Total files   : {folds_meta['total_files']}")
 
     # Identify channel groups for ablation
     print("\nChannel groups:")
@@ -412,26 +495,35 @@ def main():
     print(f"# K-Fold Analysis ({n_folds} folds)")
     print(f"{'#' * 80}")
 
-    skf = StratifiedKFold(
-        n_splits=n_folds,
-        shuffle=True,
-        random_state=data_config.seed,
-    )
-
     fold_method_results: list = []   # list of method->result dicts
     fold_ablation_results: list = [] # list of (results, display_names) tuples
     fold_metrics_list: list = []     # list of compute_full_metrics dicts
 
-    for fold_idx, (train_idx, test_idx) in enumerate(
-        skf.split(all_files, labels)
-    ):
+    for fold_entry in folds_meta["folds"]:
+        fold_idx   = fold_entry["fold"] - 1
+        train_files = fold_entry["train"]["files"]
+        test_files  = fold_entry["test"]["files"]
+
         print(f"\n{'-' * 80}")
         print(f"FOLD {fold_idx + 1} / {n_folds}")
         print(f"{'-' * 80}")
 
-        train_files = [all_files[i] for i in train_idx]
-        test_files  = [all_files[i] for i in test_idx]
-        print(f"  Train: {len(train_files)}  Test: {len(test_files)}")
+        train_counts = fold_entry["train"]["counts"]
+        test_counts  = fold_entry["test"]["counts"]
+        train_total  = fold_entry["train"]["total"]
+        test_total   = fold_entry["test"]["total"]
+
+        # Class counts + ratios
+        train_ratio_str = "  ".join(
+            f"{cls}: {cnt}/{train_total} ({cnt/train_total:.1%})"
+            for cls, cnt in sorted(train_counts.items())
+        )
+        test_ratio_str = "  ".join(
+            f"{cls}: {cnt}/{test_total} ({cnt/test_total:.1%})"
+            for cls, cnt in sorted(test_counts.items())
+        )
+        print(f"  Train ({train_total} files): {train_ratio_str}")
+        print(f"  Test  ({test_total} files):  {test_ratio_str}")
 
         train_loader, test_loader = create_dataloaders(
             train_files,
@@ -665,6 +757,29 @@ def main():
         )
 
     # -------------------------------------------------------------------------
+    # Save classification results summary JSON
+    # -------------------------------------------------------------------------
+    _metric_keys = ["auc", "accuracy", "sensitivity", "specificity", "ppv", "brier_score"]
+    results_summary = {
+        "model":      model_name,
+        "n_folds":    n_folds,
+        "folds_meta": args.folds_meta,
+        "metric_summary": {
+            key: {
+                "mean": float(np.mean([m[key] for m in fold_metrics_list])),
+                "std":  float(np.std( [m[key] for m in fold_metrics_list])),
+                "per_fold": [float(m[key]) for m in fold_metrics_list],
+            }
+            for key in _metric_keys
+        },
+        "confusion_matrix_sum": summed_cm.tolist(),
+    }
+    results_json_path = os.path.join(save_dir, f"{prefix}_results_summary.json")
+    with open(results_json_path, "w") as f:
+        json.dump(results_summary, f, indent=2)
+    print(f"  Saved results summary to {results_json_path}")
+
+    # -------------------------------------------------------------------------
     # Summary
     # -------------------------------------------------------------------------
     print("\n" + "=" * 80)
@@ -672,6 +787,9 @@ def main():
     print("=" * 80)
     print(f"\nAll results saved to: {save_dir}/")
     print("\nKey output files:")
+    print(f"  {prefix}_results_summary.json     — classification metrics (JSON)")
+    print(f"  {prefix}_test_metrics.csv         — per-fold metrics table")
+    print(f"  {prefix}_confusion_matrix.png     — aggregated confusion matrix")
     print(f"  {prefix}_all_methods.png          — importance by all methods (side-by-side)")
     print(f"  {prefix}_method_corr_heatmap.png  — Spearman ρ heatmap")
     print(f"  {prefix}_method_correlations.csv  — Spearman ρ values")
