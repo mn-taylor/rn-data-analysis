@@ -15,7 +15,7 @@ device: cuda:6      # cuda | cpu | mps
 # Data
 # -----------------------------------------------------------------------------
 data:
-  root: /home/keaneong/rn-data-analysis/data   # root with POSITIVE/ and CONTROL/ subdirs
+  root: /home/keaneong/rn-data-analysis/data/mdd_data_v3/mdd   # root with POSITIVE/ and CONTROL/ subdirs
   # root: /Users/keane/Desktop/research/rn-data-analysis/data/mdd_data_v3/mdd
   T: 512                                         # time-series length after resampling
   batch_size: 32
