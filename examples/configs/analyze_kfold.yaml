@@ -94,8 +94,12 @@ channel_groups:
     prefixes: [301, 302, 401]
 
   generalist:
-    display_name: "Generalist\n(hOR17-4)"
-    prefixes: [201, 202]
+    display_name: "Generalist\n(hOR17-4/hOR2H1)"
+    prefixes: [201, 202, 501, 502]
+
+  temperature:
+    display_name: "Temperature"
+    prefixes: ["temperature"]
 
 
 # -----------------------------------------------------------------------------
