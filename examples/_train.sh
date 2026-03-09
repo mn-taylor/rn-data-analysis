@@ -21,19 +21,23 @@ set -e
 # ---------------------------------------------------------------------------
 # Paths — edit these to match your setup
 # ---------------------------------------------------------------------------
+# CONFIG="examples/configs/analyze_kfold.yaml"
+# FOLDS="data/original_data/original/folds_meta.json"
+# RESULTS_ROOT="data/original_data/original_results_v2"
+# DATA_ROOT="data/original_data/original"
 CONFIG="examples/configs/analyze_kfold.yaml"
-FOLDS="folds_meta.json"
-RESULTS_ROOT="results"
-DATA_ROOT="/home/keaneong/rn-data-analysis/data/mdd_data_v3/mdd"
+FOLDS="data/mdd_data_v3/mdd_48h/folds_meta.json"
+RESULTS_ROOT="data/mdd_data_v3/mdd_48h_results"
+DATA_ROOT="data/mdd_data_v3/mdd_48h"
 
 # ---------------------------------------------------------------------------
 # Models to train — add or remove entries as needed
 # ---------------------------------------------------------------------------
 MODELS=(
     "ImprovedCNN1D"
-    "ResNet1D"
-    "InceptionTime"
-    "ROCKET"
+    # "ResNet1D"
+    # "InceptionTime"
+    # "ROCKET"
 )
 
 cd "$(dirname "$0")/.."

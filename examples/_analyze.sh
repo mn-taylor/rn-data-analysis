@@ -18,10 +18,14 @@ set -e
 # Paths — edit these to match your setup
 # ---------------------------------------------------------------------------
 # assume all are run from the project root, so paths are relative to that
+# CONFIG="examples/configs/analyze_kfold.yaml"
+# FOLDS="data/mdd_data_v3/mdd_48h/folds_meta.json"
+# RESULTS_ROOT="data/mdd_data_v3/mdd_48h_results"
+# DATA_ROOT="data/mdd_data_v3/mdd_48h"
 CONFIG="examples/configs/analyze_kfold.yaml"
-FOLDS="folds_meta.json"
-RESULTS_ROOT="results"
-DATA_ROOT="/home/keaneong/rn-data-analysis/data/mdd_data_v3/mdd"
+FOLDS="data/original_data/original/folds_meta.json"
+RESULTS_ROOT="data/original_data/original_results_v2"
+DATA_ROOT="data/original_data/original"
 
 # ---------------------------------------------------------------------------
 # Timestamp — identifies which training run's checkpoints to use.
@@ -29,16 +33,16 @@ DATA_ROOT="/home/keaneong/rn-data-analysis/data/mdd_data_v3/mdd"
 # Override by setting TIMESTAMP before calling this script:
 #   TIMESTAMP=20260309_143022 ./examples/_analyze.sh
 # ---------------------------------------------------------------------------
-: "${TIMESTAMP:=}"
+: "${TIMESTAMP:=}"  # default to empty if not set
 
 # ---------------------------------------------------------------------------
 # Models to analyse — must match what was trained in _train.sh
 # ---------------------------------------------------------------------------
 MODELS=(
     "ImprovedCNN1D"
-    "ResNet1D"
-    "InceptionTime"
-    "ROCKET"
+    # "ResNet1D"
+    # "InceptionTime"
+    # "ROCKET"
 )
 
 cd "$(dirname "$0")/.."
