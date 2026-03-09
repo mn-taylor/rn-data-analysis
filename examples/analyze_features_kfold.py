@@ -371,9 +371,20 @@ def main():
         help="Explicit output directory for this run (checkpoints + analysis outputs). "
              "If omitted, auto-generates results_root/{model}/{model}_run_{timestamp}/",
     )
+    parser.add_argument(
+        "--data-root",
+        type=str,
+        default=None,
+        help="Override data.root from config (path containing POSITIVE/ and CONTROL/ subdirs)",
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config)
+
+    # Apply data-root override before anything reads cfg["data"]["root"]
+    if args.data_root is not None:
+        cfg["data"] = dict(cfg["data"])
+        cfg["data"]["root"] = args.data_root
 
     # -------------------------------------------------------------------------
     # Load or create fold splits

@@ -105,6 +105,10 @@ def main():
         help="Explicit output directory for this run. "
              "If omitted, auto-generates results_root/{model}/{model}_run_{timestamp}/",
     )
+    parser.add_argument(
+        "--data-root", type=str, default=None,
+        help="Override data.root from config (path containing POSITIVE/ and CONTROL/ subdirs)",
+    )
     args = parser.parse_args()
 
     cfg        = load_config(args.config)
@@ -115,7 +119,10 @@ def main():
     training_cfg = cfg["training"]
     output_cfg   = cfg["output"]
 
-    # CLI --model overrides the config value
+    # CLI overrides
+    if args.data_root is not None:
+        data_cfg = dict(data_cfg)
+        data_cfg["root"] = args.data_root
     if args.model is not None:
         model_cfg = dict(model_cfg)
         model_cfg["name"] = args.model

@@ -24,6 +24,7 @@ set -e
 CONFIG="examples/configs/analyze_kfold.yaml"
 FOLDS="folds_meta.json"
 RESULTS_ROOT="results"
+DATA_ROOT="/home/keaneong/rn-data-analysis/data/mdd_data_v3/mdd"
 
 # ---------------------------------------------------------------------------
 # Models to train — add or remove entries as needed
@@ -43,6 +44,7 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 echo "=============================================="
 echo "Config      : $CONFIG"
 echo "Folds meta  : $FOLDS"
+echo "Data root   : $DATA_ROOT"
 echo "Results root: $RESULTS_ROOT"
 echo "Models      : ${MODELS[*]}"
 echo "Timestamp   : $TIMESTAMP"
@@ -70,7 +72,8 @@ for MODEL in "${MODELS[@]}"; do
         --config "$CONFIG" \
         --folds-meta "$FOLDS" \
         --model "$MODEL" \
-        --run-save-dir "$RUN_DIR"
+        --run-save-dir "$RUN_DIR" \
+        --data-root "$DATA_ROOT"
 done
 
 # Save timestamp so _analyze.sh can find these run directories
