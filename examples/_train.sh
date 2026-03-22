@@ -46,7 +46,7 @@ MODELS=(
     # "ResNet1D"
     # "InceptionTime"
     # "ROCKET"
-    # "TimesNet"
+    "TimesNet"
     # "TSLANet"
 )
 
