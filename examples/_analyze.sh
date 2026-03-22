@@ -49,6 +49,7 @@ MODELS=(
 )
 
 cd "$(dirname "$0")/.."
+export PYTHONUNBUFFERED=1  # flush Python output immediately (avoids apparent hang)
 
 # Resolve timestamp
 if [ -n "$TIMESTAMP" ]; then

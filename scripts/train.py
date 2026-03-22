@@ -26,6 +26,7 @@ def train_epoch(
     loss_fn: nn.Module,
     device: torch.device,
     grad_clip: Optional[float] = None,
+    epoch_desc: str = "",
 ) -> Tuple[float, float]:
     """Train for one epoch.
 
@@ -36,14 +37,17 @@ def train_epoch(
         loss_fn: Loss function
         device: Device to train on
         grad_clip: Gradient clipping value (None = no clipping)
+        epoch_desc: If non-empty, print batch progress ~5 times per epoch.
 
     Returns:
         Tuple of (average_loss, accuracy)
     """
     model.train()
     total, correct, loss_sum = 0, 0, 0.0
+    n_batches = len(dataloader)
+    log_every = max(1, n_batches // 5) if epoch_desc else 0
 
-    for x, y in dataloader:
+    for batch_idx, (x, y) in enumerate(dataloader):
         x, y = x.to(device), y.to(device)
         logits = model(x)
         loss = loss_fn(logits, y)
@@ -60,6 +64,13 @@ def train_epoch(
         pred = logits.argmax(dim=1)
         correct += (pred == y).sum().item()
         total += x.size(0)
+
+        if log_every and (batch_idx + 1) % log_every == 0:
+            print(
+                f"    {epoch_desc}  [{batch_idx + 1}/{n_batches}]"
+                f"  loss: {loss.item():.4f}",
+                flush=True,
+            )
 
     return loss_sum / max(total, 1), correct / max(total, 1)
 
@@ -294,7 +305,8 @@ def train_model(
     for epoch in epoch_iter:
         # Train
         train_loss, train_acc = train_epoch(
-            model, train_loader, optimizer, loss_fn, device, grad_clip
+            model, train_loader, optimizer, loss_fn, device, grad_clip,
+            epoch_desc=f"Epoch {epoch:3d}/{epochs}" if use_tqdm else "",
         )
 
         # Validate
