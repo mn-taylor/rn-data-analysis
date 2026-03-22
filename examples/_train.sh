@@ -25,21 +25,29 @@ set -e
 # FOLDS="data/original_data/original/folds_meta.json"
 # RESULTS_ROOT="data/original_data/original_results_v2"
 # DATA_ROOT="data/original_data/original"
+
+# CONFIG="examples/configs/analyze_kfold.yaml"
+# FOLDS="data/mdd_data_v3/mdd/folds_meta.json"
+# RESULTS_ROOT="data/mdd_data_v3/mdd_results"
+# DATA_ROOT="data/mdd_data_v3/mdd"
+# CUDA_DEVICE="cuda:0"   # e.g. cuda:0, cuda:1, cpu
+
 CONFIG="examples/configs/analyze_kfold.yaml"
 FOLDS="data/mdd_data_v3/mdd_48h/folds_meta.json"
 RESULTS_ROOT="data/mdd_data_v3/mdd_48h_results"
 DATA_ROOT="data/mdd_data_v3/mdd_48h"
+CUDA_DEVICE="cuda:7"   # e.g. cuda:0, cuda:1, cpu
 
 # ---------------------------------------------------------------------------
 # Models to train — add or remove entries as needed
 # ---------------------------------------------------------------------------
 MODELS=(
     "ImprovedCNN1D"
-    # "ResNet1D"
-    # "InceptionTime"
-    # "ROCKET"
-    # "TimesNet"
-    # "TSLANet"
+    "ResNet1D"
+    "InceptionTime"
+    "ROCKET"
+    "TimesNet"
+    "TSLANet"
 )
 
 cd "$(dirname "$0")/.."
@@ -79,7 +87,8 @@ for MODEL in "${MODELS[@]}"; do
         --folds-meta "$FOLDS" \
         --model "$MODEL" \
         --run-save-dir "$RUN_DIR" \
-        --data-root "$DATA_ROOT"
+        --data-root "$DATA_ROOT" \
+        --device "$CUDA_DEVICE"
 done
 
 # Save timestamp so _analyze.sh can find these run directories

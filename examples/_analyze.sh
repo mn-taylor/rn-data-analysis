@@ -26,6 +26,7 @@ CONFIG="examples/configs/analyze_kfold.yaml"
 FOLDS="data/original_data/original/folds_meta.json"
 RESULTS_ROOT="data/original_data/original_results_v2"
 DATA_ROOT="data/original_data/original"
+CUDA_DEVICE="cuda:0"   # e.g. cuda:0, cuda:1, cpu
 
 # ---------------------------------------------------------------------------
 # Timestamp — identifies which training run's checkpoints to use.
@@ -102,7 +103,8 @@ for MODEL in "${MODELS[@]}"; do
         --folds-meta "$FOLDS" \
         --model "$MODEL" \
         --run-save-dir "$RUN_DIR" \
-        --data-root "$DATA_ROOT"
+        --data-root "$DATA_ROOT" \
+        --device "$CUDA_DEVICE"
 done
 
 echo ""

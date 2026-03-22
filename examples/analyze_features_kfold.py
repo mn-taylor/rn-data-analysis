@@ -414,6 +414,10 @@ def main():
         default=None,
         help="Override data.root from config (path containing POSITIVE/ and CONTROL/ subdirs)",
     )
+    parser.add_argument(
+        "--device", type=str, default=None,
+        help="Override device from config (e.g. cuda:0, cuda:1, cpu)",
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -509,6 +513,8 @@ def main():
     # Environment
     # -------------------------------------------------------------------------
     set_seed(data_cfg.get("seed", 42))
+    if args.device is not None:
+        cfg["device"] = args.device
     device = get_device(cfg.get("device", "cuda"))
     print(f"\n  Device: {device}")
 
