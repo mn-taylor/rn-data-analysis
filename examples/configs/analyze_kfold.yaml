@@ -25,7 +25,7 @@ data:
 # Model
 # -----------------------------------------------------------------------------
 model:
-  name: ImprovedCNN1D    # ImprovedCNN1D | ResNet1D | InceptionTime | ROCKET
+  name: ImprovedCNN1D    # ImprovedCNN1D | ResNet1D | InceptionTime | ROCKET | TimesNet | TSLANet
   dropout: 0.3
 
   # InceptionTime-specific (ignored for other models)
@@ -34,6 +34,16 @@ model:
 
   # ROCKET-specific (ignored for other models)
   num_kernels: 5000
+
+  # TimesNet-specific (ignored for other models)
+  d_model: 64
+  d_ff: 64
+  e_layers: 2
+  top_k: 5
+
+  # TSLANet-specific (ignored for other models)
+  emb_dim: 128
+  patch_size: 8
 
 
 # -----------------------------------------------------------------------------

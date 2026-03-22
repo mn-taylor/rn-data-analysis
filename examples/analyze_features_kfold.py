@@ -53,6 +53,8 @@ from scripts.models import (
     ResNet1D,
     InceptionTime,
     RocketClassifier,
+    TimesNetWrapper,
+    TSLANetWrapper,
 )
 from scripts.train import train_model, compute_full_metrics
 from scripts.utils.utils import set_seed, get_device, plot_confusion_matrix
@@ -91,8 +93,9 @@ def load_config(path: str) -> dict:
 # Model factory
 # =============================================================================
 
-def build_model(model_name: str, input_channels: int, model_cfg: dict):
+def build_model(model_name: str, input_channels: int, model_cfg: dict, seq_len: int = 512):
     """Instantiate the model specified in the config."""
+    import types
     dropout = model_cfg.get("dropout", 0.3)
 
     if model_name == "ImprovedCNN1D":
@@ -121,6 +124,40 @@ def build_model(model_name: str, input_channels: int, model_cfg: dict):
             num_kernels=model_cfg.get("num_kernels", 5000),
             dropout=dropout,
         )
+
+    elif model_name == "TimesNet":
+        configs = types.SimpleNamespace(
+            task_name   = "classification",
+            seq_len     = seq_len,
+            label_len   = 0,
+            pred_len    = 0,
+            enc_in      = input_channels,
+            num_class   = 2,
+            d_model     = model_cfg.get("d_model", 64),
+            d_ff        = model_cfg.get("d_ff", 64),
+            e_layers    = model_cfg.get("e_layers", 2),
+            embed       = model_cfg.get("embed", "timeF"),
+            freq        = model_cfg.get("freq", "h"),
+            dropout     = dropout,
+            top_k       = model_cfg.get("top_k", 5),
+            num_kernels = model_cfg.get("num_kernels", 6),
+        )
+        return TimesNetWrapper(configs)
+
+    elif model_name == "TSLANet":
+        configs = types.SimpleNamespace(
+            seq_len         = seq_len,
+            enc_in          = input_channels,
+            num_class       = 2,
+            emb_dim         = model_cfg.get("emb_dim", 128),
+            depth           = model_cfg.get("depth", 2),
+            patch_size      = model_cfg.get("patch_size", 8),
+            dropout         = model_cfg.get("dropout", 0.15),
+            use_asb         = model_cfg.get("use_asb", True),
+            use_icb         = model_cfg.get("use_icb", True),
+            adaptive_filter = model_cfg.get("adaptive_filter", True),
+        )
+        return TSLANetWrapper(configs)
 
     else:
         raise ValueError(f"Unknown model: {model_name!r}")
@@ -362,7 +399,7 @@ def main():
         "--model",
         type=str,
         default=None,
-        help="Override model name from config (ImprovedCNN1D | ResNet1D | InceptionTime | ROCKET)",
+        help="Override model name from config (ImprovedCNN1D | ResNet1D | InceptionTime | ROCKET | TimesNet | TSLANet)",
     )
     parser.add_argument(
         "--run-save-dir",
@@ -549,7 +586,7 @@ def main():
         model_path = os.path.join(
             save_dir, f"{model_name}_fold{fold_idx}.pth"
         )
-        model = build_model(model_name, input_channels, model_cfg)
+        model = build_model(model_name, input_channels, model_cfg, seq_len=data_config.T)
         model = get_or_train_model(
             model, model_path, train_loader, test_loader,
             training_cfg, device,
@@ -613,6 +650,8 @@ def main():
     for key, label in zip(_metric_keys, _metric_labels):
         vals = [m[key] for m in fold_metrics_list]
         print(f"  {label:<14}  {np.mean(vals):>8.4f}  {np.std(vals):>8.4f}")
+
+    prefix = model_name
 
     # Save per-fold metrics to CSV
     metrics_rows = []
@@ -703,8 +742,6 @@ def main():
     # Save and plot — importance methods
     # -------------------------------------------------------------------------
     print("\nSaving results...")
-
-    prefix = model_name
 
     # Permutation: aggregated bar chart + CSV
     if "permutation" in aggregated_methods:

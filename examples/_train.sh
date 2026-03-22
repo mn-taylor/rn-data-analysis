@@ -38,6 +38,8 @@ MODELS=(
     # "ResNet1D"
     # "InceptionTime"
     # "ROCKET"
+    # "TimesNet"
+    # "TSLANet"
 )
 
 cd "$(dirname "$0")/.."
@@ -84,6 +86,59 @@ done
 echo "$TIMESTAMP" > .last_run_id
 echo ""
 echo "Saved run ID to .last_run_id (timestamp: $TIMESTAMP)"
+
+# Step 3: Print cross-model summary
+echo ""
+echo "=============================================="
+echo "TRAINING SUMMARY"
+echo "=============================================="
+export _RESULTS_ROOT="$RESULTS_ROOT"
+export _TIMESTAMP="$TIMESTAMP"
+export _MODELS="${MODELS[*]}"
+python3 - <<'PYEOF'
+import json, os, sys
+
+results_root = os.environ.get("_RESULTS_ROOT")
+timestamp    = os.environ.get("_TIMESTAMP")
+models       = [m for m in os.environ.get("_MODELS", "").split() if m]
+
+METRICS = ["auc", "accuracy", "sensitivity", "specificity", "ppv", "brier_score"]
+LABELS  = ["AUC", "Accuracy", "Sens", "Spec", "PPV", "Brier"]
+
+rows = []
+for model in models:
+    path = os.path.join(results_root, model,
+                        f"{model}_run_{timestamp}",
+                        f"{model}_train_summary.json")
+    if not os.path.exists(path):
+        print(f"  [WARNING] No summary found for {model}: {path}", file=sys.stderr)
+        continue
+    with open(path) as f:
+        data = json.load(f)
+    ms = data["metric_summary"]
+    row = {"model": model}
+    for key in METRICS:
+        m, s = ms[key]["mean"], ms[key]["std"]
+        row[key] = f"{m:.4f}±{s:.4f}"
+    rows.append(row)
+
+if not rows:
+    print("  No results found.")
+    sys.exit(0)
+
+col_w = max(len(r["model"]) for r in rows) + 2
+print(f"  {'Model':<{col_w}}", end="")
+for lbl in LABELS:
+    print(f"  {lbl:>15}", end="")
+print()
+print("  " + "-" * (col_w + len(LABELS) * 17))
+for row in rows:
+    print(f"  {row['model']:<{col_w}}", end="")
+    for key in METRICS:
+        print(f"  {row[key]:>15}", end="")
+    print()
+PYEOF
+
 echo ""
 echo "Done. Trained ${#MODELS[@]} model(s): ${MODELS[*]}"
 echo "Results in: $RESULTS_ROOT/{model}/{model}_run_${TIMESTAMP}/"

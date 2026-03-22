@@ -43,6 +43,8 @@ MODELS=(
     # "ResNet1D"
     # "InceptionTime"
     # "ROCKET"
+    # "TimesNet"
+    # "TSLANet"
 )
 
 cd "$(dirname "$0")/.."

@@ -3,6 +3,8 @@ from .transformer import TimeSeriesTransformer
 from .resnet1d import ResNet1D
 from .inception_time import InceptionTime
 from .rocket import RocketClassifier
+from .timesnet import TimesNetWrapper
+from .tslanet import TSLANetWrapper
 
 __all__ = [
     "ImprovedCNN1D",
@@ -10,4 +12,6 @@ __all__ = [
     "ResNet1D",
     "InceptionTime",
     "RocketClassifier",
+    "TimesNetWrapper",
+    "TSLANetWrapper",
 ]
