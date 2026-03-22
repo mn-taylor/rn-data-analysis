@@ -51,6 +51,7 @@ MODELS=(
 )
 
 cd "$(dirname "$0")/.."
+export PYTHONUNBUFFERED=1  # flush Python output immediately (avoids apparent hang)
 
 # Generate a shared timestamp for this training run
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)

@@ -95,8 +95,8 @@ def build_model(model_name: str, input_channels: int, model_cfg: dict, seq_len: 
             embed       = model_cfg.get("embed", "timeF"),
             freq        = model_cfg.get("freq", "h"),
             dropout     = dropout,
-            top_k       = model_cfg.get("top_k", 5),
-            num_kernels = model_cfg.get("num_kernels", 6),
+            top_k       = model_cfg.get("top_k", 3),
+            num_kernels = model_cfg.get("num_kernels", 3),
         )
         return TimesNetWrapper(configs)
     elif model_name == "TSLANet":
