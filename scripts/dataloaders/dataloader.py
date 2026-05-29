@@ -66,6 +66,7 @@ class CycleDataset(Dataset):
         # Extract time and features
         t = df["relative_time_sec"].to_numpy()
         X = df[self.feature_cols].to_numpy(dtype=np.float32)  # (N, C)
+        X = np.nan_to_num(X, nan=0.0)  # absent sensors → zero signal
 
         # Resample to fixed length T using linear interpolation
         t_grid = np.linspace(t.min(), t.max(), self.T)
