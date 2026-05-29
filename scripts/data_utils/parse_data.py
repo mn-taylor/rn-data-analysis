@@ -64,9 +64,9 @@ def split_cycles_sorted_by_patient_type(
 
 if __name__ == "__main__":
 
-    df = pd.read_csv("/Users/keane/Desktop/research/rn-data-analysis/data/mdd_data_v3/unparsed/MDD-48h.csv")
+    df = pd.read_csv("/Users/keane/Desktop/research/rn-data-analysis/data/andreas_patient_holdout_seed42/eval/MDD-May-2026.csv")
 
     # usage:
     split_cycles_sorted_by_patient_type(
-        df, "/Users/keane/Desktop/research/rn-data-analysis/data/mdd_data_v3/unparsed/MDD-48h_metadata.json", "/Users/keane/Desktop/research/rn-data-analysis/data/mdd_data_v3/unparsed/MDD-48h_patients.json", out_dir="/Users/keane/Desktop/research/rn-data-analysis/data/mdd_data_v3/mdd_48h/"
+        df, "/Users/keane/Desktop/research/rn-data-analysis/data/andreas_patient_holdout_seed42/eval/MDD-May-2026_metadata.json", "/Users/keane/Desktop/research/rn-data-analysis/data/andreas_patient_holdout_seed42/eval/MDD-May-2026_patients.json", out_dir="/Users/keane/Desktop/research/rn-data-analysis/data/may2026_parsed_data/eval"
     )

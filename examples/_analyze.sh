@@ -22,11 +22,26 @@ set -e
 # FOLDS="data/mdd_data_v3/mdd_48h/folds_meta.json"
 # RESULTS_ROOT="data/mdd_data_v3/mdd_48h_results"
 # DATA_ROOT="data/mdd_data_v3/mdd_48h"
+
 CONFIG="examples/configs/analyze_kfold.yaml"
-FOLDS="data/original_data/original/folds_meta.json"
-RESULTS_ROOT="data/original_data/original_results_v2"
-DATA_ROOT="data/original_data/original"
 CUDA_DEVICE="cuda:0"   # e.g. cuda:0, cuda:1, cpu
+
+# ---------------------------------------------------------------------------
+# Mode toggle — must match the setting used in _train.sh for this run.
+# ---------------------------------------------------------------------------
+USE_FIXED_SPLIT=false
+
+if [ "$USE_FIXED_SPLIT" = "true" ]; then
+    TRAIN_DIR="/home/keaneong/scratch/keane/rn_mdd/may2026_parsed_data/train"
+    EVAL_DIR="/home/keaneong/scratch/keane/rn_mdd/may2026_parsed_data/eval"
+    FOLDS="/home/keaneong/scratch/keane/rn_mdd/may2026_parsed_data/fixed_split_meta.json"
+    RESULTS_ROOT="/home/keaneong/scratch/keane/rn_mdd/may2026_parsed_data/results"
+    DATA_ROOT="/home/keaneong/scratch/keane/rn_mdd/may2026_parsed_data"
+else
+    FOLDS="data/original_data/original/folds_meta.json"
+    RESULTS_ROOT="data/original_data/original_results_v2"
+    DATA_ROOT="data/original_data/original"
+fi
 
 # ---------------------------------------------------------------------------
 # Timestamp — identifies which training run's checkpoints to use.
@@ -75,11 +90,11 @@ echo "Models      : ${MODELS[*]}"
 echo "Timestamp   : $TIMESTAMP"
 echo "=============================================="
 
-# Guard: folds must exist
+# Guard: folds meta must exist
 if [ ! -f "$FOLDS" ]; then
     echo ""
     echo "ERROR: Folds meta not found at '$FOLDS'."
-    echo "       Run ./examples/_train.sh first."
+    echo "       Run ./examples/_train.sh (with the same USE_FIXED_SPLIT setting) first."
     exit 1
 fi
 

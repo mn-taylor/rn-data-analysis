@@ -33,10 +33,25 @@ set -e
 # CUDA_DEVICE="cuda:0"   # e.g. cuda:0, cuda:1, cpu
 
 CONFIG="examples/configs/analyze_kfold.yaml"
-FOLDS="data/mdd_data_v3/mdd_48h/folds_meta.json"
-RESULTS_ROOT="data/mdd_data_v3/mdd_48h_results"
-DATA_ROOT="data/mdd_data_v3/mdd_48h"
 CUDA_DEVICE="cuda:7"   # e.g. cuda:0, cuda:1, cpu
+
+# ---------------------------------------------------------------------------
+# Mode toggle — set USE_FIXED_SPLIT=true to use the pre-defined train/eval
+# split, or false for k-fold cross-validation.
+# ---------------------------------------------------------------------------
+USE_FIXED_SPLIT=true
+
+if [ "$USE_FIXED_SPLIT" = "true" ]; then
+    TRAIN_DIR="/home/keaneong/scratch/keane/rn_mdd/may2026_parsed_data/train"
+    EVAL_DIR="/home/keaneong/scratch/keane/rn_mdd/may2026_parsed_data/eval"
+    FOLDS="/home/keaneong/scratch/keane/rn_mdd/may2026_parsed_data/fixed_split_meta.json"
+    RESULTS_ROOT="/home/keaneong/scratch/keane/rn_mdd/may2026_parsed_data/results"
+    DATA_ROOT="/home/keaneong/scratch/keane/rn_mdd/may2026_parsed_data"
+else
+    FOLDS="data/mdd_data_v3/mdd_48h/folds_meta.json"
+    RESULTS_ROOT="data/mdd_data_v3/mdd_48h_results"
+    DATA_ROOT="data/mdd_data_v3/mdd_48h"
+fi
 
 # ---------------------------------------------------------------------------
 # Models to train — add or remove entries as needed
@@ -65,14 +80,28 @@ echo "Models      : ${MODELS[*]}"
 echo "Timestamp   : $TIMESTAMP"
 echo "=============================================="
 
-# Step 1: Create fold splits once (shared across all models)
-if [ ! -f "$FOLDS" ]; then
+# Step 1: Create fold splits (or fixed-split meta) once, shared across all models
+if [ "$USE_FIXED_SPLIT" = "true" ]; then
     echo ""
-    echo ">>> Creating fold splits..."
-    python scripts/data_utils/create_folds.py --config "$CONFIG" --output "$FOLDS"
+    echo ">>> Fixed-split mode — using pre-defined train/eval split"
+    if [ ! -f "$FOLDS" ]; then
+        echo ">>> Creating fixed split meta..."
+        python scripts/data_utils/create_fixed_split.py \
+            --train-dir "$TRAIN_DIR" \
+            --eval-dir  "$EVAL_DIR" \
+            --output    "$FOLDS"
+    else
+        echo ">>> Using existing fixed split meta: $FOLDS"
+    fi
 else
-    echo ""
-    echo ">>> Using existing fold splits: $FOLDS"
+    if [ ! -f "$FOLDS" ]; then
+        echo ""
+        echo ">>> Creating fold splits..."
+        python scripts/data_utils/create_folds.py --config "$CONFIG" --output "$FOLDS"
+    else
+        echo ""
+        echo ">>> Using existing fold splits: $FOLDS"
+    fi
 fi
 
 # Step 2: Train each model in its own timestamped run directory
