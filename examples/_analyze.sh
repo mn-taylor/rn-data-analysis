@@ -24,12 +24,12 @@ set -e
 # DATA_ROOT="data/mdd_data_v3/mdd_48h"
 
 CONFIG="examples/configs/analyze_kfold.yaml"
-CUDA_DEVICE="cuda:0"   # e.g. cuda:0, cuda:1, cpu
+CUDA_DEVICE="cuda:1"   # e.g. cuda:0, cuda:1, cpu
 
 # ---------------------------------------------------------------------------
 # Mode toggle — must match the setting used in _train.sh for this run.
 # ---------------------------------------------------------------------------
-USE_FIXED_SPLIT=false
+USE_FIXED_SPLIT=true
 
 if [ "$USE_FIXED_SPLIT" = "true" ]; then
     TRAIN_DIR="/home/keaneong/scratch/keane/rn_mdd/may2026_parsed_data/train"
