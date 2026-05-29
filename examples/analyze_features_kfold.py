@@ -45,6 +45,7 @@ from sklearn.model_selection import StratifiedKFold
 from scripts.utils.config import DataConfig
 from scripts.dataloaders.dataloader import (
     create_dataloaders,
+    compute_feature_cols,
     list_csvs_by_class,
     get_file_labels,
 )
@@ -418,6 +419,19 @@ def main():
         "--device", type=str, default=None,
         help="Override device from config (e.g. cuda:0, cuda:1, cpu)",
     )
+    parser.add_argument(
+        "--nan-strategy", type=str, default="fill_zero",
+        choices=["fill_zero", "clean_only", "drop_sparse"],
+        help="How to handle sensor columns that are NaN in some files: "
+             "fill_zero=keep all cols (NaN→0), "
+             "clean_only=only cols non-NaN in every file, "
+             "drop_sparse=drop cols NaN in >sparse-threshold fraction of files",
+    )
+    parser.add_argument(
+        "--sparse-threshold", type=float, default=0.5,
+        help="For --nan-strategy drop_sparse: drop columns NaN in more than "
+             "this fraction of training files (default: 0.5)",
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -529,13 +543,11 @@ def main():
         seed=data_cfg.get("seed", 42),
     )
 
-    # Detect feature columns from first train file in fold 0
-    first_file = folds_meta["folds"][0]["train"]["files"][0]
-    df0 = pd.read_csv(first_file)
-    id_cols = {"run_id", "cycle", "relative_time_sec", "section", "patient_id"}
-    feature_cols   = [c for c in df0.columns if c not in id_cols]
+    # Determine feature columns (and thus input channels) across all folds
+    all_train_files = [f for fold in folds_meta["folds"] for f in fold["train"]["files"]]
+    feature_cols   = compute_feature_cols(all_train_files, args.nan_strategy, args.sparse_threshold)
     input_channels = len(feature_cols)
-    print(f"  Input channels: {input_channels}")
+    print(f"  Input channels : {input_channels}  (nan_strategy={args.nan_strategy})")
     print(f"  Total files   : {folds_meta['total_files']}")
 
     # Identify channel groups for ablation
@@ -586,6 +598,7 @@ def main():
             T=data_config.T,
             batch_size=data_config.batch_size,
             output_format="channels_first",
+            feature_cols=feature_cols,
         )
 
         # Load or train model

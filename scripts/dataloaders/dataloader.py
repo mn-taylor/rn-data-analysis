@@ -15,6 +15,50 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 
+_ID_COLS = {"run_id", "cycle", "relative_time_sec", "section", "patient_id"}
+
+
+def compute_feature_cols(
+    files: List[str],
+    nan_strategy: str = "fill_zero",
+    sparse_threshold: float = 0.5,
+) -> List[str]:
+    """Return the feature columns to use based on the NaN handling strategy.
+
+    Args:
+        files: CSV paths to scan (use all training files across all folds).
+        nan_strategy:
+            "fill_zero"   — keep all columns, NaN filled with 0 at load time.
+            "clean_only"  — keep only columns non-NaN in every file.
+            "drop_sparse" — drop columns that are entirely NaN in more than
+                            sparse_threshold fraction of files; fill any
+                            remaining NaN with 0 at load time.
+        sparse_threshold: Fraction threshold for "drop_sparse" (0.0–1.0).
+    """
+    df0 = pd.read_csv(files[0], nrows=1)
+    all_cols = [c for c in df0.columns if c not in _ID_COLS]
+
+    if nan_strategy == "fill_zero":
+        return all_cols
+
+    n = len(files)
+    nan_count: Dict[str, int] = {c: 0 for c in all_cols}
+    for path in files:
+        df = pd.read_csv(path)
+        for c in all_cols:
+            if c in df.columns and df[c].isna().all():
+                nan_count[c] += 1
+
+    if nan_strategy == "clean_only":
+        return [c for c in all_cols if nan_count[c] == 0]
+    elif nan_strategy == "drop_sparse":
+        return [c for c in all_cols if nan_count[c] / n <= sparse_threshold]
+    else:
+        raise ValueError(
+            f"Unknown nan_strategy {nan_strategy!r}. "
+            "Choose from: fill_zero, clean_only, drop_sparse"
+        )
+
 
 class CycleDataset(Dataset):
     """Dataset for cycle-level time series data.
@@ -48,11 +92,8 @@ class CycleDataset(Dataset):
         self.T = T
         self.output_format = output_format
 
-        # Infer feature columns from the first file unless provided
         if feature_cols is None:
-            df0 = pd.read_csv(files[0])
-            id_cols = {"run_id", "cycle", "relative_time_sec", "section", "patient_id"}
-            self.feature_cols = [c for c in df0.columns if c not in id_cols]
+            self.feature_cols = compute_feature_cols(files)
         else:
             self.feature_cols = list(feature_cols)
 
@@ -161,6 +202,9 @@ def create_dataloaders(
     batch_size: int = 32,
     num_workers: int = 0,
     output_format: str = "channels_first",
+    nan_strategy: str = "fill_zero",
+    sparse_threshold: float = 0.5,
+    feature_cols: Optional[List[str]] = None,
 ) -> Tuple[DataLoader, DataLoader]:
     """Create train and test DataLoaders.
 
@@ -172,17 +216,22 @@ def create_dataloaders(
         batch_size: Batch size
         num_workers: Number of DataLoader workers
         output_format: "channels_first" or "time_first"
+        nan_strategy: NaN column handling — "fill_zero", "clean_only",
+            or "drop_sparse" (see compute_feature_cols).
+        sparse_threshold: Fraction threshold for "drop_sparse" (0.0–1.0).
+        feature_cols: Pre-computed column list; skips scanning if provided.
 
     Returns:
         Tuple of (train_loader, test_loader)
     """
-    # Build train dataset first (to lock feature_cols), then reuse for test
-    train_ds = CycleDataset(train_files, label_map, T=T, output_format=output_format)
+    if feature_cols is None:
+        feature_cols = compute_feature_cols(train_files, nan_strategy, sparse_threshold)
+    train_ds = CycleDataset(train_files, label_map, T=T, feature_cols=feature_cols, output_format=output_format)
     test_ds = CycleDataset(
         test_files,
         label_map,
         T=T,
-        feature_cols=train_ds.feature_cols,
+        feature_cols=feature_cols,
         output_format=output_format,
     )
 

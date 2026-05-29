@@ -65,6 +65,17 @@ MODELS=(
     # "TSLANet"
 )
 
+# ---------------------------------------------------------------------------
+# NaN strategy — controls how sensor columns absent in some files are handled.
+# Must match the setting used in _analyze.sh for this run.
+#   fill_zero   — keep all columns, missing sensor readings → 0 (default)
+#   clean_only  — use only the ~56 columns non-NaN in every file
+#   drop_sparse — drop columns NaN in > SPARSE_THRESHOLD fraction of files,
+#                 fill remaining NaN with 0
+# ---------------------------------------------------------------------------
+NAN_STRATEGY="drop_sparse"
+SPARSE_THRESHOLD="0.5"
+
 cd "$(dirname "$0")/.."
 export PYTHONUNBUFFERED=1  # flush Python output immediately (avoids apparent hang)
 
@@ -118,7 +129,9 @@ for MODEL in "${MODELS[@]}"; do
         --model "$MODEL" \
         --run-save-dir "$RUN_DIR" \
         --data-root "$DATA_ROOT" \
-        --device "$CUDA_DEVICE"
+        --device "$CUDA_DEVICE" \
+        --nan-strategy "$NAN_STRATEGY" \
+        --sparse-threshold "$SPARSE_THRESHOLD"
 done
 
 # Save timestamp so _analyze.sh can find these run directories

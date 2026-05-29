@@ -63,6 +63,17 @@ MODELS=(
     # "TSLANet"
 )
 
+# ---------------------------------------------------------------------------
+# NaN strategy — must match the setting used in _train.sh for this run,
+# so the dataloader sees the same feature columns as during training.
+#   fill_zero   — keep all columns, missing sensor readings → 0 (default)
+#   clean_only  — use only the ~56 columns non-NaN in every file
+#   drop_sparse — drop columns NaN in > SPARSE_THRESHOLD fraction of files,
+#                 fill remaining NaN with 0
+# ---------------------------------------------------------------------------
+NAN_STRATEGY="fill_zero"
+SPARSE_THRESHOLD="0.5"
+
 cd "$(dirname "$0")/.."
 export PYTHONUNBUFFERED=1  # flush Python output immediately (avoids apparent hang)
 
@@ -120,7 +131,9 @@ for MODEL in "${MODELS[@]}"; do
         --model "$MODEL" \
         --run-save-dir "$RUN_DIR" \
         --data-root "$DATA_ROOT" \
-        --device "$CUDA_DEVICE"
+        --device "$CUDA_DEVICE" \
+        --nan-strategy "$NAN_STRATEGY" \
+        --sparse-threshold "$SPARSE_THRESHOLD"
 done
 
 echo ""
