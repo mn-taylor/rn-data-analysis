@@ -247,6 +247,7 @@ def run_importance_methods(
         results["occlusion"] = compute_occlusion_importance(
             model, test_loader, feature_names, device,
             metric=metric,
+            n_parallel_features=n_parallel_features,
         )
 
     if "integrated_gradients" in methods:

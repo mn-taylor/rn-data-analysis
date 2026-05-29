@@ -578,12 +578,31 @@ def save_importance_results(
 # Occlusion Importance
 # =============================================================================
 
+def _build_occluded_mega_batch(
+    X: torch.Tensor, feat_indices: List[int], channel_means: np.ndarray
+) -> torch.Tensor:
+    """Stack n_chunk occluded copies of X into one mega-batch.
+
+    Layout: feat0, feat1, ..., each of size B. Returns (n_chunk * B, C, T).
+    """
+    copies = []
+    for feat_idx in feat_indices:
+        X_occ = X.clone()
+        if X.dim() == 3:
+            X_occ[:, feat_idx, :] = float(channel_means[feat_idx])
+        else:
+            X_occ[:, feat_idx] = float(channel_means[feat_idx])
+        copies.append(X_occ)
+    return torch.cat(copies, dim=0)
+
+
 def compute_occlusion_importance(
     model: nn.Module,
     dataloader: DataLoader,
     feature_names: List[str],
     device: str = "cpu",
     metric: str = "accuracy",
+    n_parallel_features: int = 1,
 ) -> Dict[str, np.ndarray]:
     """Occlusion sensitivity: mask each feature channel with its dataset mean.
 
@@ -597,6 +616,11 @@ def compute_occlusion_importance(
         feature_names: List of feature names (length = num_channels)
         device: Device to run on
         metric: Metric to use ("accuracy" or "auc")
+        n_parallel_features: Number of features to occlude simultaneously.
+            >1 stacks n_parallel_features occluded copies of each batch into a
+            single forward pass (~N× speedup). Less memory pressure than
+            permutation (no repeats dimension): 4→~72 MB, 8→~144 MB, 16→~288 MB
+            extra per batch (B=32).
 
     Returns:
         Dictionary with "importances", "importances_std", "baseline_score",
@@ -608,16 +632,64 @@ def compute_occlusion_importance(
     channel_means = _compute_channel_means(dataloader, device)
     baseline_score = _evaluate_model(model, dataloader, device, metric)
     print(f"Baseline {metric}: {baseline_score:.4f}")
+    print(f"\nComputing occlusion importance for {len(feature_names)} features "
+          f"(n_parallel_features={n_parallel_features})...")
 
     n_features = len(feature_names)
     importance_scores = np.zeros(n_features)
 
-    for feat_idx in tqdm(range(n_features), desc="Occlusion"):
-        fill = float(channel_means[feat_idx])
-        score = _evaluate_model_with_occlusion(
-            model, dataloader, device, feat_idx, metric, fill_value=fill
-        )
-        importance_scores[feat_idx] = baseline_score - score
+    if n_parallel_features <= 1:
+        # --- sequential path (original) ---
+        for feat_idx in tqdm(range(n_features), desc="Occlusion"):
+            fill = float(channel_means[feat_idx])
+            score = _evaluate_model_with_occlusion(
+                model, dataloader, device, feat_idx, metric, fill_value=fill
+            )
+            importance_scores[feat_idx] = baseline_score - score
+
+    else:
+        # --- vectorized path: process n_parallel_features at once ---
+        from sklearn.metrics import roc_auc_score as _roc_auc
+
+        n_chunks = (n_features + n_parallel_features - 1) // n_parallel_features
+        for chunk_start in tqdm(range(0, n_features, n_parallel_features), desc="Occlusion chunks",
+                                total=n_chunks):
+            chunk_feats = list(range(chunk_start,
+                                     min(chunk_start + n_parallel_features, n_features)))
+            n_chunk = len(chunk_feats)
+
+            slot_preds = [[] for _ in range(n_chunk)]
+            slot_probs = [[] for _ in range(n_chunk)]
+            all_labels = []
+
+            for X, y in dataloader:
+                X, y = X.to(device), y.to(device)
+                B = X.shape[0]
+
+                mega = _build_occluded_mega_batch(X, chunk_feats, channel_means)
+                with torch.no_grad():
+                    logits = model(mega)  # (n_chunk * B, n_classes)
+                probs_mega = torch.softmax(logits, dim=1)
+                preds_mega = logits.argmax(dim=1)
+
+                all_labels.append(y.cpu().numpy())
+
+                for i in range(n_chunk):
+                    s, e = i * B, i * B + B
+                    slot_preds[i].append(preds_mega[s:e].cpu().numpy())
+                    slot_probs[i].append(probs_mega[s:e, 1].cpu().numpy())
+
+            labels = np.concatenate(all_labels)
+            for i, feat_idx in enumerate(chunk_feats):
+                preds_i = np.concatenate(slot_preds[i])
+                probs_i = np.concatenate(slot_probs[i])
+                if metric == "accuracy":
+                    score = (preds_i == labels).mean()
+                elif metric == "auc":
+                    score = _roc_auc(labels, probs_i)
+                else:
+                    raise ValueError(f"Unknown metric: {metric}")
+                importance_scores[feat_idx] = baseline_score - score
 
     return {
         "importances": importance_scores,
