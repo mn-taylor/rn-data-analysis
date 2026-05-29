@@ -71,7 +71,7 @@ MODELS=(
 #   drop_sparse — drop columns NaN in > SPARSE_THRESHOLD fraction of files,
 #                 fill remaining NaN with 0
 # ---------------------------------------------------------------------------
-NAN_STRATEGY="fill_zero"
+NAN_STRATEGY="drop_sparse"
 SPARSE_THRESHOLD="0.5"
 
 cd "$(dirname "$0")/.."

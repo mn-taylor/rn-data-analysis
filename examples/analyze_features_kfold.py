@@ -544,10 +544,20 @@ def main():
     )
 
     # Determine feature columns (and thus input channels) across all folds
-    all_train_files = [f for fold in folds_meta["folds"] for f in fold["train"]["files"]]
-    feature_cols   = compute_feature_cols(all_train_files, args.nan_strategy, args.sparse_threshold)
+    all_train_files   = [f for fold in folds_meta["folds"] for f in fold["train"]["files"]]
+    feature_cols_path = os.path.join(save_dir, "feature_cols.json")
+
+    if os.path.exists(feature_cols_path):
+        with open(feature_cols_path) as _f:
+            feature_cols = json.load(_f)
+        print(f"  Loaded feature cols from: {feature_cols_path}  ({len(feature_cols)} channels)")
+    else:
+        print(f"  WARNING: No feature_cols.json found — recomputing with nan_strategy={args.nan_strategy}")
+        print(f"           Ensure this matches the strategy used during training.")
+        feature_cols = compute_feature_cols(all_train_files, args.nan_strategy, args.sparse_threshold)
+
     input_channels = len(feature_cols)
-    print(f"  Input channels : {input_channels}  (nan_strategy={args.nan_strategy})")
+    print(f"  Input channels : {input_channels}")
     print(f"  Total files   : {folds_meta['total_files']}")
 
     # Identify channel groups for ablation

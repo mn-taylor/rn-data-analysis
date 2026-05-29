@@ -213,6 +213,11 @@ def main():
     input_channels = len(feature_cols)
     print(f"  Input channels : {input_channels}  (nan_strategy={args.nan_strategy})")
 
+    feature_cols_path = os.path.join(save_dir, "feature_cols.json")
+    with open(feature_cols_path, "w") as _f:
+        json.dump(feature_cols, _f)
+    print(f"  Feature cols saved: {feature_cols_path}")
+
     label_map   = folds_meta["label_map"]
     data_config = DataConfig(
         root=data_cfg["root"],
