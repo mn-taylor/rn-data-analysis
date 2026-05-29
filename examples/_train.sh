@@ -26,14 +26,14 @@ set -e
 # RESULTS_ROOT="data/original_data/original_results_v2"
 # DATA_ROOT="data/original_data/original"
 
-# CONFIG="examples/configs/analyze_kfold.yaml"
-# FOLDS="data/mdd_data_v3/mdd/folds_meta.json"
-# RESULTS_ROOT="data/mdd_data_v3/mdd_results"
-# DATA_ROOT="data/mdd_data_v3/mdd"
-# CUDA_DEVICE="cuda:0"   # e.g. cuda:0, cuda:1, cpu
-
 CONFIG="examples/configs/analyze_kfold.yaml"
 CUDA_DEVICE="cuda:7"   # e.g. cuda:0, cuda:1, cpu
+
+# CONFIG="examples/configs/analyze_kfold.yaml"
+# FOLDS="data/mdd_data_v3/mdd_48h/folds_meta.json"
+# RESULTS_ROOT="data/mdd_data_v3/mdd_48h_results"
+# DATA_ROOT="data/mdd_data_v3/mdd_48h"
+# CUDA_DEVICE="cuda:7"   # e.g. cuda:0, cuda:1, cpu
 
 # ---------------------------------------------------------------------------
 # Mode toggle — set USE_FIXED_SPLIT=true to use the pre-defined train/eval
@@ -57,12 +57,12 @@ fi
 # Models to train — add or remove entries as needed
 # ---------------------------------------------------------------------------
 MODELS=(
-    "ImprovedCNN1D"
-    "ResNet1D"
-    "InceptionTime"
-    "ROCKET"
+    # "ImprovedCNN1D"
+    # "ResNet1D"
+    # "InceptionTime"
+    # "ROCKET"
     "TimesNet"
-    "TSLANet"
+    # "TSLANet"
 )
 
 cd "$(dirname "$0")/.."
