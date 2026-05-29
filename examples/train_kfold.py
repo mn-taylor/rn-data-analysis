@@ -260,6 +260,8 @@ def main():
                 epochs=training_cfg.get("epochs", 50),
                 early_stopping_patience=training_cfg.get("early_stopping_patience", 10),
                 checkpoint_path=model_path,
+                use_tqdm=False,
+                print_every=1,
             )
             print(f"  Saved checkpoint: {model_path}")
 
