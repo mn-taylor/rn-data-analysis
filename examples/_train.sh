@@ -57,11 +57,11 @@ fi
 # Models to train — add or remove entries as needed
 # ---------------------------------------------------------------------------
 MODELS=(
-    # "ImprovedCNN1D"
-    # "ResNet1D"
-    # "InceptionTime"
-    # "ROCKET"
-    "TimesNet"
+    "ImprovedCNN1D"
+    "ResNet1D"
+    "InceptionTime"
+    "ROCKET"
+    # "TimesNet"
     # "TSLANet"
 )
 
