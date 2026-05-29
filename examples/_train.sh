@@ -147,7 +147,7 @@ echo "=============================================="
 export _RESULTS_ROOT="$RESULTS_ROOT"
 export _TIMESTAMP="$TIMESTAMP"
 export _MODELS="${MODELS[*]}"
-python3 - <<'PYEOF'
+python3 - <<'PYEOF' | tee "$RESULTS_ROOT/results_summary_${TIMESTAMP}.txt"
 import json, os, sys
 
 results_root = os.environ.get("_RESULTS_ROOT")
