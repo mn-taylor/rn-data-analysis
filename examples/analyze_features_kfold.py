@@ -226,6 +226,7 @@ def run_importance_methods(
     analysis_cfg: dict,
     device,
     model_name: str,
+    n_parallel_features: int = 1,
 ) -> dict:
     """Run all enabled importance methods and return a results dict."""
     methods  = analysis_cfg.get("methods", ["permutation"])
@@ -238,6 +239,7 @@ def run_importance_methods(
             model, test_loader, feature_names, device,
             n_repeats=analysis_cfg.get("n_repeats", 5),
             metric=metric,
+            n_parallel_features=n_parallel_features,
         )
 
     if "occlusion" in methods:
@@ -431,6 +433,12 @@ def main():
         "--sparse-threshold", type=float, default=0.5,
         help="For --nan-strategy drop_sparse: drop columns NaN in more than "
              "this fraction of training files (default: 0.5)",
+    )
+    parser.add_argument(
+        "--n-parallel-features", type=int, default=1,
+        help="Number of features to permute simultaneously in permutation importance. "
+             ">1 batches multiple permutations into one forward pass (~N× speedup). "
+             "Tune to GPU memory: 4≈360MB, 8≈720MB, 16≈1.4GB extra per batch (B=32).",
     )
     args = parser.parse_args()
 
@@ -641,7 +649,8 @@ def main():
         # -- Importance methods --
         print(f"\n  Computing importance methods for fold {fold_idx + 1}...")
         fold_res = run_importance_methods(
-            model, test_loader, feature_cols, analysis_cfg, device, model_name
+            model, test_loader, feature_cols, analysis_cfg, device, model_name,
+            n_parallel_features=args.n_parallel_features,
         )
         fold_method_results.append(fold_res)
 

@@ -74,6 +74,13 @@ MODELS=(
 NAN_STRATEGY="drop_sparse"
 SPARSE_THRESHOLD="0.5"
 
+# ---------------------------------------------------------------------------
+# Permutation importance parallelism — how many features to permute at once.
+# >1 stacks multiple permutations into a single forward pass for a ~N× speedup.
+# Tune to available GPU memory: 4≈360 MB, 8≈720 MB, 16≈1.4 GB extra per batch.
+# ---------------------------------------------------------------------------
+N_PARALLEL_FEATURES=16
+
 cd "$(dirname "$0")/.."
 export PYTHONUNBUFFERED=1  # flush Python output immediately (avoids apparent hang)
 
@@ -133,7 +140,8 @@ for MODEL in "${MODELS[@]}"; do
         --data-root "$DATA_ROOT" \
         --device "$CUDA_DEVICE" \
         --nan-strategy "$NAN_STRATEGY" \
-        --sparse-threshold "$SPARSE_THRESHOLD"
+        --sparse-threshold "$SPARSE_THRESHOLD" \
+        --n-parallel-features "$N_PARALLEL_FEATURES"
 done
 
 echo ""

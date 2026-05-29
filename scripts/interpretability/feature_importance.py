@@ -16,6 +16,27 @@ from typing import Dict, List, Optional, Tuple, Union
 from tqdm import tqdm
 
 
+def _build_permuted_mega_batch(
+    X: torch.Tensor, feat_indices: List[int], n_repeats: int, device: str
+) -> torch.Tensor:
+    """Stack n_chunk * n_repeats permuted copies of X into one mega-batch.
+
+    Layout: (feat0,rep0), (feat0,rep1), ..., (feat1,rep0), ... each of size B.
+    Returns shape: (n_chunk * n_repeats * B, C, T).
+    """
+    copies = []
+    for feat_idx in feat_indices:
+        for _ in range(n_repeats):
+            X_p = X.clone()
+            perm = torch.randperm(X.shape[0], device=device)
+            if X.dim() == 3:
+                X_p[:, feat_idx, :] = X[perm, feat_idx, :]
+            else:
+                X_p[:, feat_idx] = X[perm, feat_idx]
+            copies.append(X_p)
+    return torch.cat(copies, dim=0)
+
+
 def compute_permutation_importance(
     model: nn.Module,
     dataloader: DataLoader,
@@ -23,6 +44,7 @@ def compute_permutation_importance(
     device: str = "cpu",
     n_repeats: int = 10,
     metric: str = "accuracy",
+    n_parallel_features: int = 1,
 ) -> Dict[str, np.ndarray]:
     """Compute permutation feature importance.
 
@@ -36,6 +58,13 @@ def compute_permutation_importance(
         device: Device to run on ("cpu" or "cuda")
         n_repeats: Number of times to repeat permutation per feature
         metric: Metric to use ("accuracy" or "auc")
+        n_parallel_features: Number of features to permute simultaneously.
+            >1 stacks n_parallel_features * n_repeats permuted copies of each
+            batch into a single forward pass, reducing total GPU launches by
+            ~n_parallel_features×. Tune to GPU memory:
+              4  → ~360 MB extra per batch (B=32)
+              8  → ~720 MB
+              16 → ~1.4 GB
 
     Returns:
         Dictionary with:
@@ -46,36 +75,79 @@ def compute_permutation_importance(
     model.eval()
     model = model.to(device)
 
-    # Get baseline score
     baseline_score = _evaluate_model(model, dataloader, device, metric)
 
     n_features = len(feature_names)
     importance_scores = np.zeros((n_features, n_repeats))
 
     print(f"Baseline {metric}: {baseline_score:.4f}")
-    print(f"\nComputing permutation importance for {n_features} features...")
+    print(f"\nComputing permutation importance for {n_features} features "
+          f"(n_parallel_features={n_parallel_features})...")
 
-    # Track some permuted scores for debugging
-    debug_scores = []
+    if n_parallel_features <= 1:
+        # --- sequential path (original) ---
+        debug_scores = []
+        for feat_idx in tqdm(range(n_features), desc="Features"):
+            for repeat_idx in range(n_repeats):
+                score = _evaluate_model_with_permutation(
+                    model, dataloader, device, feat_idx, metric
+                )
+                importance_scores[feat_idx, repeat_idx] = baseline_score - score
+                if feat_idx < 3 and repeat_idx == 0:
+                    debug_scores.append((feature_names[feat_idx], score, baseline_score - score))
 
-    for feat_idx in tqdm(range(n_features), desc="Features"):
-        for repeat_idx in range(n_repeats):
-            # Permute this feature and evaluate
-            score = _evaluate_model_with_permutation(
-                model, dataloader, device, feat_idx, metric
-            )
-            # Importance = drop in performance
-            importance_scores[feat_idx, repeat_idx] = baseline_score - score
+        if debug_scores:
+            print("\nDebug: First 3 features permutation results:")
+            for fname, perm_score, importance in debug_scores:
+                print(f"  {fname}: permuted_score={perm_score:.4f}, importance={importance:.4f}")
 
-            # Store first 3 features' scores for debugging
-            if feat_idx < 3 and repeat_idx == 0:
-                debug_scores.append((feature_names[feat_idx], score, baseline_score - score))
+    else:
+        # --- vectorized path: process n_parallel_features at once ---
+        from sklearn.metrics import roc_auc_score as _roc_auc
 
-    # Print debug info
-    if debug_scores:
-        print("\nDebug: First 3 features permutation results:")
-        for fname, perm_score, importance in debug_scores:
-            print(f"  {fname}: permuted_score={perm_score:.4f}, importance={importance:.4f}")
+        n_chunks = (n_features + n_parallel_features - 1) // n_parallel_features
+        for chunk_start in tqdm(range(0, n_features, n_parallel_features), desc="Feature chunks",
+                                total=n_chunks):
+            chunk_feats = list(range(chunk_start,
+                                     min(chunk_start + n_parallel_features, n_features)))
+            n_chunk = len(chunk_feats)
+
+            # slot_preds/probs[i][j] → list of arrays from each batch
+            slot_preds = [[[] for _ in range(n_repeats)] for _ in range(n_chunk)]
+            slot_probs = [[[] for _ in range(n_repeats)] for _ in range(n_chunk)]
+            all_labels = []
+
+            for X, y in dataloader:
+                X, y = X.to(device), y.to(device)
+                B = X.shape[0]
+
+                mega = _build_permuted_mega_batch(X, chunk_feats, n_repeats, device)
+                with torch.no_grad():
+                    logits = model(mega)  # (n_chunk * n_repeats * B, n_classes)
+                probs_mega = torch.softmax(logits, dim=1)
+                preds_mega = logits.argmax(dim=1)
+
+                all_labels.append(y.cpu().numpy())
+
+                for i in range(n_chunk):
+                    for j in range(n_repeats):
+                        slot = i * n_repeats + j
+                        s, e = slot * B, slot * B + B
+                        slot_preds[i][j].append(preds_mega[s:e].cpu().numpy())
+                        slot_probs[i][j].append(probs_mega[s:e, 1].cpu().numpy())
+
+            labels = np.concatenate(all_labels)
+            for i, feat_idx in enumerate(chunk_feats):
+                for j in range(n_repeats):
+                    preds_ij = np.concatenate(slot_preds[i][j])
+                    probs_ij = np.concatenate(slot_probs[i][j])
+                    if metric == "accuracy":
+                        score = (preds_ij == labels).mean()
+                    elif metric == "auc":
+                        score = _roc_auc(labels, probs_ij)
+                    else:
+                        raise ValueError(f"Unknown metric: {metric}")
+                    importance_scores[feat_idx, j] = baseline_score - score
 
     mean_importances = importance_scores.mean(axis=1)
     print(f"\nImportance statistics:")
