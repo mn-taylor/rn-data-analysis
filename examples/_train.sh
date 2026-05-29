@@ -27,7 +27,7 @@ set -e
 # DATA_ROOT="data/original_data/original"
 
 CONFIG="examples/configs/analyze_kfold.yaml"
-CUDA_DEVICE="cuda:7"   # e.g. cuda:0, cuda:1, cpu
+CUDA_DEVICE="cuda:0"   # e.g. cuda:0, cuda:1, cpu
 
 # CONFIG="examples/configs/analyze_kfold.yaml"
 # FOLDS="data/mdd_data_v3/mdd_48h/folds_meta.json"
